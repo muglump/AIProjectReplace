@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using MathNet.Numerics.LinearAlgebra.Single;
+using MathNet.Numerics.LinearAlgebra.Double;
 
 
 namespace WatsonCompetitionCode
 {
     class LogisiticRegression
     {
-        private Dictionary<int, Canidate> trainingDataSet;
+        private Dictionary<int, Candidate> trainingDataSet;
         private DenseVector theta;
         private DenseVector J;
         private DenseMatrix x;
@@ -22,7 +22,7 @@ namespace WatsonCompetitionCode
         
 
 
-        public LogisiticRegression(Dictionary<int,Canidate> data)
+        public LogisiticRegression(Dictionary<int,Candidate> data)
         {
             this.trainingDataSet = data;
             int numberFeatures = trainingDataSet[1].featuresRating.Count;
@@ -35,16 +35,16 @@ namespace WatsonCompetitionCode
            
 
             //intialize y data
-            List<float> ydata = new List<float>();
+            List<double> ydata = new List<double>();
             
 
             //fill x and y data from dictionary
-            foreach (KeyValuePair<int,Canidate> canidate in trainingDataSet)
+            foreach (KeyValuePair<int,Candidate> candidate in trainingDataSet)
             {
-                List<float> intermediate = canidate.Value.featuresRating.ToList();
+                List<double> intermediate = candidate.Value.featuresRating.ToList();
                 intermediate.Insert(0, 1);
                 xdata[k] = new DenseVector(intermediate.ToArray());
-                if (canidate.Value.isTrue) ydata.Add(1);
+                if (candidate.Value.isTrue) ydata.Add(1);
                 else ydata.Add(0);
                 k++;
             }
@@ -61,10 +61,10 @@ namespace WatsonCompetitionCode
             /*test code
             DenseVector z;
             z = x * theta;
-            float[] test1;
-            test1 = new float[3] {2,3,4};
-            float[] test2;
-            test2 = new float[3] {4,3,2};
+            double[] test1;
+            test1 = new double[3] {2,3,4};
+            double[] test2;
+            test2 = new double[3] {4,3,2};
             DenseVector test1V = new DenseVector(test1);
             DenseVector test2V = new DenseVector(test2);
             DenseVector result = (DenseVector) test1V.PointwiseMultiply(test2V);*/
@@ -76,14 +76,14 @@ namespace WatsonCompetitionCode
 
         private DenseVector sigmoid(DenseVector z)
         {
-            List<float> vector = new List<float>();
-            foreach (float element in z)
+            List<double> vector = new List<double>();
+            foreach (double element in z)
             {
-                vector.Add((float)(1.0 / (1.0 + Math.Exp(-element))));
+                vector.Add((double)(1.0 / (1.0 + Math.Exp(-element))));
             }
             return new DenseVector(vector.ToArray());
         }
-        public float probability(List<float> features)
+        public double probability(List<double> features)
         {
             return 0;
         }
@@ -113,16 +113,16 @@ namespace WatsonCompetitionCode
                 DenseMatrix H = hessian(x, h);
 
                 //Calculate J for testing convergence
-                J[k] = (float) (y.Negate().PointwiseMultiply((DenseVector) log(h)) - (1-y).PointwiseMultiply( (DenseVector) log((DenseVector)(1-h)))).Sum();
+                J[k] = (double) (y.Negate().PointwiseMultiply((DenseVector) log(h)) - (1-y).PointwiseMultiply( (DenseVector) log((DenseVector)(1-h)))).Sum();
                 theta = (DenseVector) (theta - H.Inverse()*grad);
             }
         }
         private DenseVector log(DenseVector vec)
         {
-            List<float> result = new List<float>();
-            foreach (float element in vec)
+            List<double> result = new List<double>();
+            foreach (double element in vec)
             {
-                result.Add((float)Math.Log(element));
+                result.Add((double)Math.Log(element));
             }
             return new DenseVector(result.ToArray());
         }

@@ -11,9 +11,13 @@ namespace WatsonCompetitionCode
     {
         static void Main(string[] args)
         {
+            if (args.Count() < 3) Console.WriteLine("Provide (1) Machine learning technique, (2) data file, (3) '1' to remove extraneous data");
             Util utility = new Util();
-            Dictionary<int, Canidate> dict = utility.csvReader(args[1]);
-            utility.removeExtraneouData(dict);
+            List<bool> results = new List<bool>();
+            Dictionary<int, Candidate> dict = utility.csvReader(args[1]);
+            if (args[2] == "1") utility.removeExtraneousData(dict);
+            //utility.csvWriter("tgmc_cut1.csv", dict);
+
             switch (args[0])
             {
                 case "Tree":
@@ -22,22 +26,35 @@ namespace WatsonCompetitionCode
                     DecisionTrees tree = new DecisionTrees(dict, 20);
                     Console.Write("Built Tree");
                     Console.Write("Evaluating data");
-                    List<float> answers = tree.runTree(dict, 20);
+                    List<double> answers = tree.runTree(dict, 20);
                     Console.Write("Completed");
                     break;
 
                 case "RBFNetwork":
                     
-                    List<bool> results = new List<bool>();
-                    bool RBF = true;
-                    bool DecTree = false;
-                    bool LogReg = false;
-                    Dictionary<int, Canidate> newDict = new Dictionary<int, Canidate>();
-                    Canidate cand = new Canidate();
+                    Dictionary<int, Candidate> newDict = new Dictionary<int, Candidate>();
+                    // dict = utility.csvReader("tgmctrain_small.csv");
+                    // dict = utility.csvReader("tgmc_cut1.csv");
+                    dict = utility.csvReader("tgmc_cut2.csv");
+
+                    Candidate cand = new Candidate();
                     dict.TryGetValue(5, out cand);
-                    RBFnetwork rbf = new RBFnetwork(150, cand.featuresRating.Count(), 0.1);
+                    RBFnetwork rbf = new RBFnetwork(50, cand.featuresRating.Count(), 0.05);
+
+                    //utility.dataAnalysis(dict);
+
+                    //utility.removeMore(dict, "BestFeatures.txt");
+                    //newDict = utility.randSample(dict, 1);
+                    //utility.csvWriter("tgmc_cut2.csv",newDict);
+
                     newDict = dict;
                     rbf.trainSystem(newDict);
+                    //rbf.RBFwriter("weights.txt");
+                    //results = rbf.testSystem(dict);
+
+                    //rbf.RBFreader("weights.txt");
+                    //results = rbf.testSystem(dict);
+
                     break;
 
                 case "LogisticRegression":
@@ -48,23 +65,30 @@ namespace WatsonCompetitionCode
                     Console.WriteLine("Invalid parameters");
                     break;
             }
+
+            for (int k = 0; k < dict.Count(); k++)
+            {
+                results.Add(false);
+            }
+            Console.ReadLine();
+            //utility.fileWriter(results, dict, "output.txt");
         }
 
        
     }
 
-    class Canidate
+    class Candidate
     {
         public int rowNumber;
-        public float questionNumber;
-        public List<float> featuresRating;
+        public double questionNumber;
+        public List<double> featuresRating;
         public Boolean isTrue;
 
-        public Canidate()
+        public Candidate()
         {
             rowNumber = 0;
             questionNumber = 0;
-            featuresRating = new List<float>();
+            featuresRating = new List<double>();
             isTrue = false;
         }
     }
@@ -72,11 +96,11 @@ namespace WatsonCompetitionCode
 
     class Util
     {
-        public Dictionary<int, Canidate> csvReader(string fileName)
+        public Dictionary<int, Candidate> csvReader(string fileName)
         {
             var reader = new StreamReader(File.OpenRead(@fileName));
             List<string> lineRead = new List<string>();
-            Dictionary<int, Canidate> canidates = new Dictionary<int, Canidate>();
+            Dictionary<int, Candidate> candidates = new Dictionary<int, Candidate>();
             int index = 1;
             while (!reader.EndOfStream)
             {
@@ -84,32 +108,32 @@ namespace WatsonCompetitionCode
                 var values = line.Split(',');
                 if (!string.IsNullOrEmpty(values[0]))
                 {
-                    Canidate canidate = new Canidate();
-                    canidate.rowNumber = Convert.ToInt32(values[0]);
-                    canidate.questionNumber = Convert.ToSingle(values[1]);
+                    Candidate candidate = new Candidate();
+                    candidate.rowNumber = Convert.ToInt32(values[0]);
+                    candidate.questionNumber = Convert.ToSingle(values[1]);
                     for (int i = 2; i < values.Count(); i++)
                     {
                         if (values[i] == "true" || values[i] == "false" || values[i] == "TRUE" || values[i] == "FALSE")
                         {
-                            if (values[i] == "true" || values[i] == "TRUE") canidate.isTrue = true;
-                            else canidate.isTrue = false;
+                            if (values[i] == "true" || values[i] == "TRUE") candidate.isTrue = true;
+                            else candidate.isTrue = false;
                             break;
                         }
-                        canidate.featuresRating.Add(Convert.ToSingle(values[i]));
+                        candidate.featuresRating.Add(Convert.ToSingle(values[i]));
                     }
-                    canidates.Add(index, canidate);
+                    candidates.Add(index, candidate);
                     index++;
                 }
             }
             reader.Close();
-            return canidates;
+            return candidates;
         }
 
-        public void csvWriter(string fileName, Dictionary<int, Canidate> candidates)
+        public void csvWriter(string fileName, Dictionary<int, Candidate> candidates)
         {
             File.Delete(@fileName);
             var writer = new StreamWriter(File.OpenWrite(@fileName));
-            Canidate candidate = new Canidate();
+            Candidate candidate = new Candidate();
             string stringToWrite = "";
             int i = 1;
             while (candidates.ContainsKey(i))
@@ -129,12 +153,12 @@ namespace WatsonCompetitionCode
             writer.Close();
         }
 
-        public void fileWriter(List<bool> results, Dictionary<int, Canidate> candidates, string fileName)
+        public void fileWriter(List<bool> results, Dictionary<int, Candidate> candidates, string fileName)
         {
             File.Delete(@fileName);
             var writer = new StreamWriter(File.OpenWrite(@fileName));
             int i = 1;
-            Canidate candidate = new Canidate();
+            Candidate candidate = new Candidate();
             string stringToWrite = "";
             string f = "FALSE: ";
             string t = "TRUE: ";
@@ -157,20 +181,20 @@ namespace WatsonCompetitionCode
             writer.Close();
         }
 
-        public List<int> removeExtraneouData(Dictionary<int, Canidate> canidates)
+        public List<int> removeExtraneousData(Dictionary<int, Candidate> candidates)
         {
             //intialize size of array of columns
-            List<List<float>> columns = new List<List<float>>();
-            int columnCount = canidates.Values.First().featuresRating.Count();
+            List<List<double>> columns = new List<List<double>>();
+            int columnCount = candidates.Values.First().featuresRating.Count();
             for (int k = 0; k < columnCount; k++)
             {
-                columns.Add(new List<float>());
+                columns.Add(new List<double>());
             }
 
             //Generate Array of Columns
-            foreach (KeyValuePair<int, Canidate> pair in canidates)
+            foreach (KeyValuePair<int, Candidate> pair in candidates)
             {
-                Canidate c = pair.Value;
+                Candidate c = pair.Value;
                 int length = c.featuresRating.Count;
                 for (int i = 0; i < length; i++)
                 {
@@ -205,9 +229,9 @@ namespace WatsonCompetitionCode
             //Add columns that have all same values (without doubling up on previous addition)
             for (int k = 0; k < columns.Count; k++)
             {
-                float firstElement = columns[k][0];
+                double firstElement = columns[k][0];
                 bool isRemove = true;
-                foreach (float feature in columns[k])
+                foreach (double feature in columns[k])
                 {
                     if (firstElement != feature)
                     {
@@ -225,7 +249,7 @@ namespace WatsonCompetitionCode
 
             while (removeData.Count > 0)
             {
-                foreach (KeyValuePair<int, Canidate> pair in canidates)
+                foreach (KeyValuePair<int, Candidate> pair in candidates)
                 {
                     pair.Value.featuresRating.RemoveAt(removeData.Max());
                 }
@@ -234,28 +258,28 @@ namespace WatsonCompetitionCode
                 removeData.Remove(removeData.Max());
             }
 
-            List<float> maxValues = new List<float>();
-            foreach (List<float> column in columns)
+            List<double> maxValues = new List<double>();
+            foreach (List<double> column in columns)
             {
-                float absMax;
+                double absMax;
                 if (Math.Abs(column.Min()) > Math.Abs(column.Max())) absMax = Math.Abs(column.Min());
                 else absMax = Math.Abs(column.Max());
-                if (absMax == 0.0) absMax = (float)1.0;
+                if (absMax == 0.0) absMax = (double)1.0;
                 maxValues.Add(absMax);
             }
 
             for (int k = 0; k < maxValues.Count; k++)
             {
-                foreach (KeyValuePair<int, Canidate> canidate in canidates)
+                foreach (KeyValuePair<int, Candidate> candidate in candidates)
                 {
-                    canidate.Value.featuresRating[k] = (canidate.Value.featuresRating[k] / maxValues[k]);
+                    candidate.Value.featuresRating[k] = (candidate.Value.featuresRating[k] / maxValues[k]);
                 }
             }
 
             return result;
         }
 
-        public void removeMore(Dictionary<int, Canidate> canidates, string fileName)
+        public void removeMore(Dictionary<int, Candidate> candidates, string fileName)
         {
             // Assumes file is 1 indexed (like Matlab)
             var reader = new StreamReader(File.OpenRead(@fileName));
@@ -269,17 +293,17 @@ namespace WatsonCompetitionCode
             reader.Close();
 
             //intialize size of array of columns
-            List<List<float>> columns = new List<List<float>>();
-            int columnCount = canidates.Values.First().featuresRating.Count();
+            List<List<double>> columns = new List<List<double>>();
+            int columnCount = candidates.Values.First().featuresRating.Count();
             for (int k = 0; k < columnCount; k++)
             {
-                columns.Add(new List<float>());
+                columns.Add(new List<double>());
             }
 
             //Generate Array of Columns
-            foreach (KeyValuePair<int, Canidate> pair in canidates)
+            foreach (KeyValuePair<int, Candidate> pair in candidates)
             {
-                Canidate c = pair.Value;
+                Candidate c = pair.Value;
                 int length = c.featuresRating.Count;
                 for (int i = 0; i < length; i++)
                 {
@@ -300,7 +324,7 @@ namespace WatsonCompetitionCode
             List<int> result = removeData.ToList();
             while (removeData.Count > 0)
             {
-                foreach (KeyValuePair<int, Canidate> pair in canidates)
+                foreach (KeyValuePair<int, Candidate> pair in candidates)
                 {
                     pair.Value.featuresRating.RemoveAt(removeData.Max());
                 }
@@ -310,17 +334,17 @@ namespace WatsonCompetitionCode
             }
         }
 
-        public Dictionary<int, Canidate> randSample(Dictionary<int, Canidate> candidates, int FperT)
+        public Dictionary<int, Candidate> randSample(Dictionary<int, Candidate> candidates, int FperT)
         {
-            Dictionary<int, Canidate> final = new Dictionary<int, Canidate>();
+            Dictionary<int, Candidate> final = new Dictionary<int, Candidate>();
             int i = 1;
             Random random = new Random();
             int average = (int)55 / FperT;
             int index = (int)(random.NextDouble() * (2 * average));
             int count = 0;
-            foreach (KeyValuePair<int, Canidate> pair in candidates)
+            foreach (KeyValuePair<int, Candidate> pair in candidates)
             {
-                Canidate c = pair.Value;
+                Candidate c = pair.Value;
                 if (c.isTrue)
                 {
                     final.Add(i, c);
@@ -342,7 +366,7 @@ namespace WatsonCompetitionCode
             return final;
         }
 
-        public void dataAnalysis(Dictionary<int, Canidate> candidates)
+        public void dataAnalysis(Dictionary<int, Candidate> candidates)
         {
             List<double> meanT = new List<double>();
             List<double> standDevT = new List<double>();
@@ -350,7 +374,7 @@ namespace WatsonCompetitionCode
             List<double> meanF = new List<double>();
             List<double> standDevF = new List<double>();
             int numFalse = 0;
-            Canidate candidate = new Canidate();
+            Candidate candidate = new Candidate();
 
             //intialize size of array of columns
             List<List<double>> columns = new List<List<double>>();
@@ -366,9 +390,9 @@ namespace WatsonCompetitionCode
 
             //Generate Array of Columns
             int length = 0;
-            foreach (KeyValuePair<int, Canidate> pair in candidates)
+            foreach (KeyValuePair<int, Candidate> pair in candidates)
             {
-                Canidate c = pair.Value;
+                Candidate c = pair.Value;
                 length = c.featuresRating.Count;
                 for (int i = 0; i < length; i++)
                 {

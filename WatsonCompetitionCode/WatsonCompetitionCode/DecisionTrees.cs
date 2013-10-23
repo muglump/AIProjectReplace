@@ -13,14 +13,14 @@ namespace WatsonCompetitionCode
     {
         TreeNode startNode;
 
-        public DecisionTrees(Dictionary<int, Canidate> canidates, int branchesPerNode)
+        public DecisionTrees(Dictionary<int, Candidate> candidates, int branchesPerNode)
         {
-            List<List<float>> rows = new List<List<float>>();
+            List<List<double>> rows = new List<List<double>>();
             List<bool> rowTruth = new List<bool>();
             //Pull apart the dictionary because its easier to work with this way.
             //Additionally fill a 2D List of all rows and columns, and a List of the row truths
-            List<Canidate> listCandidates = new List<Canidate>();
-            foreach (Canidate value in canidates.Values)
+            List<Candidate> listCandidates = new List<Candidate>();
+            foreach (Candidate value in candidates.Values)
             {
                 listCandidates.Add(value);
                 rows.Add(value.featuresRating);
@@ -76,15 +76,15 @@ namespace WatsonCompetitionCode
             Console.WriteLine("Built");
         }
 
-        public List<float> runTree(Dictionary<int, Canidate> canidates, int branchesPerNode)
+        public List<double> runTree(Dictionary<int, Candidate> candidates, int branchesPerNode)
         {
-            List<float> validAnswer = new List<float>();
-            List<List<float>> rows = new List<List<float>>();
+            List<double> validAnswer = new List<double>();
+            List<List<double>> rows = new List<List<double>>();
             //Pull apart the dictionary because its easier to work with this way.
             //Additionally fill a 2D List of all rows and columns
-            List<Canidate> listCandidates = new List<Canidate>();
+            List<Candidate> listCandidates = new List<Candidate>();
             
-            foreach (Canidate value in canidates.Values)
+            foreach (Candidate value in candidates.Values)
             {
                 listCandidates.Add(value);
                 rows.Add(value.featuresRating);
@@ -133,7 +133,7 @@ namespace WatsonCompetitionCode
 
 
         //This function takes a 2D list and reduces the variation in columns such that only and allowed number of values
-        private List<List<int>> reduceBranching(List<List<float>> rows, int branchesPerNode)
+        private List<List<int>> reduceBranching(List<List<double>> rows, int branchesPerNode)
         {
             List<List<int>> newRows = new List<List<int>>();
             //start at the first column and loop through the column values by row
@@ -142,7 +142,7 @@ namespace WatsonCompetitionCode
                 newRows.Add(new List<int>());
             }
             for(int columnindex=0; columnindex < rows[0].Count; columnindex++){
-                List<float> columnValues = new List<float>();
+                List<double> columnValues = new List<double>();
                 
                 for (int rowindex = 0; rowindex < rows.Count; rowindex++)
                 {
@@ -170,10 +170,10 @@ namespace WatsonCompetitionCode
         //This method reduces the number of values such that they are <= branches number of different values
         //To do this we sort the list, and split it into branches number of sublists.
         //The median is then found for each sublist, and values are assigned by the current values relationship to those values
-        private List<int> reduce(List<float> column, int branches)
+        private List<int> reduce(List<double> column, int branches)
         {
-            List<float> values = new List<float>();
-            foreach(float value in column)
+            List<double> values = new List<double>();
+            foreach(double value in column)
             {
                 if (!values.Contains(value))
                 {
@@ -183,7 +183,7 @@ namespace WatsonCompetitionCode
             if (values.Count == 1)
             {
                 List<int> newList = new List<int>();
-                foreach (float value in column)
+                foreach (double value in column)
                 {
                     newList.Add(Convert.ToInt32(value));
                 }
@@ -191,7 +191,7 @@ namespace WatsonCompetitionCode
             column.Sort();
             //Figure out how to divide the items, this may result in slightly unequal arrays but it happend to be the best way to divide 
             int divider = column.Count / branches - 1;
-            List<List<float>> listOfSubList = new List<List<float>>();
+            List<List<double>> listOfSubList = new List<List<double>>();
             int lowerbound = 0;
             int upperbound = divider;
             int step = 0;
@@ -202,7 +202,7 @@ namespace WatsonCompetitionCode
                 {
                     upperbound = column.Count - 1;
                 }
-                List<float> sublist = new List<float>();
+                List<double> sublist = new List<double>();
                 for (int i = lowerbound; lowerbound <= upperbound; lowerbound++)
                 {
                     sublist.Add(i);
@@ -214,10 +214,10 @@ namespace WatsonCompetitionCode
             }
 
             //Find the means of each sublist
-            List<float> means = new List<float>();
-            foreach (List<float> list in listOfSubList)
+            List<double> means = new List<double>();
+            foreach (List<double> list in listOfSubList)
             {
-                float value = 0;
+                double value = 0;
                 for (int k = 0; k < list.Count; k++)
                 {
                     value += list[k];
@@ -230,7 +230,7 @@ namespace WatsonCompetitionCode
             List<int> newColumn = new List<int>();
             Console.WriteLine("Looking at n Values: " + column.Count);
             
-            foreach (float value in column)
+            foreach (double value in column)
             {
                 for (int j = 0; j < means.Count; j++)
                 {
@@ -257,10 +257,10 @@ namespace WatsonCompetitionCode
 
 
         //Checks the number of values in the List, if there are more then allowedNum returns true, otherwise false;
-        private bool nValues(List<float> vals, int allowedNum)
+        private bool nValues(List<double> vals, int allowedNum)
         {
-            List<float> values = new List<float>();
-            foreach (float item in vals)
+            List<double> values = new List<double>();
+            foreach (double item in vals)
             {
                 if (!values.Contains(item))
                 {

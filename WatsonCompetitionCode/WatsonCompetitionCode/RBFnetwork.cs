@@ -35,8 +35,8 @@ namespace WatsonCompetitionCode
                 variance.Add(new List<double>());
                 for (int j = 0; j < numFeatures; j++)
                 {
-                    mean[k].Add(2*(random.NextDouble() - 0.5));
-                    variance[k].Add(random.NextDouble()*3.25);
+                    mean[k].Add(1.1 * random.NextDouble() - 0.1);
+                    variance[k].Add(random.NextDouble() * 5);
                 }
                 weight.Add(1);
                 BF.Add(0);
@@ -68,7 +68,7 @@ namespace WatsonCompetitionCode
             line = reader.ReadLine();
             numFeatures = Convert.ToInt32(line);
             line = reader.ReadLine();
-            learningRate = (float) Convert.ToDouble(line);
+            learningRate = (float)Convert.ToDouble(line);
 
             mean = new List<List<double>>();
             variance = new List<List<double>>();
@@ -156,7 +156,7 @@ namespace WatsonCompetitionCode
             strToWrite.Clear();
             strToWrite.Append(weight[0].ToString());
             for (int k = 1; k < numNodes; k++)
-            {               
+            {
                 strToWrite.Append(',' + weight[k].ToString());
             }
             writer.WriteLine(strToWrite.ToString());
@@ -164,10 +164,10 @@ namespace WatsonCompetitionCode
             writer.Close();
         }
 
-        private float basisFunction(List<float> input, int hidUnNum)
+        private float basisFunction(List<double> input, int hidUnNum)
         {
             double result = 0;
-            for (int k = 0; k < numFeatures; k++)
+            for (int k = 0; k < input.Count(); k++)
             {
                 result -= Math.Pow(input[k] - mean[hidUnNum][k], 2) / (2 * Math.Pow(variance[hidUnNum][k], 2));
             }
@@ -175,7 +175,7 @@ namespace WatsonCompetitionCode
             return (float)Math.Exp(result);
         }
 
-        private double useSystem(List<float> features)
+        private double useSystem(List<double> features)
         {
             double output = 0;
             double bfout = 0;
@@ -190,7 +190,7 @@ namespace WatsonCompetitionCode
             return output;
         }
 
-        public void trainSystem(Dictionary<int, Canidate> candidates)
+        public void trainSystem(Dictionary<int, Candidate> candidates)
         {
             List<List<double>> deltaMean = new List<List<double>>();
             List<List<double>> deltaVariance = new List<List<double>>();
@@ -198,7 +198,7 @@ namespace WatsonCompetitionCode
             int i = 0;
             double checker = 0;
             float candCheck = 0;
-            Canidate candidate = new Canidate();
+            Candidate candidate = new Candidate();
             int djdy = -1;
             double dHUdm = 1;
             double dHUdv = 1;
@@ -234,7 +234,7 @@ namespace WatsonCompetitionCode
                     {
                         if (candCheck == 1) numOffT++;
                         else numOffF++;
-                                            
+
                         if (checker > candCheck) djdy = -1;
                         else djdy = 1;
 
@@ -243,11 +243,15 @@ namespace WatsonCompetitionCode
                             for (int j = 0; j < numFeatures; j++)
                             {
                                 dHUdm = ((mean[k][j] - candidate.featuresRating[j]) / (Math.Pow(variance[k][j], 2)));
-                                dHUdv = (Math.Pow(candidate.featuresRating[j] - mean[k][j], 2) / Math.Pow(variance[k][j], 3)) -1 / variance[k][j];
+                                dHUdv = (Math.Pow(candidate.featuresRating[j] - mean[k][j], 2) / Math.Pow(variance[k][j], 3)); //-1 / variance[k][j];
                                 deltaMean[k][j] = learningRate * djdy * weight[k] * BF[k] * dHUdm;
                                 deltaVariance[k][j] = learningRate * djdy * weight[k] * BF[k] * dHUdv;
+
+                                //mean[k][j] += learningRate * djdy * weight[k] * BF[k] * dHUdm;
+                                //variance[k][j] += learningRate * djdy * weight[k] * BF[k] * dHUdv;
                             }
                             deltaWeight[k] = learningRate * djdy * BF[k];
+                            //weight[k] += learningRate * djdy * BF[k];
                         }
                     }
                     i++;
@@ -270,12 +274,12 @@ namespace WatsonCompetitionCode
             Console.WriteLine("I'm done training!\n");
         }
 
-        public List<bool> testSystem(Dictionary<int, Canidate> candidates)
+        public List<bool> testSystem(Dictionary<int, Candidate> candidates)
         {
             List<bool> results = new List<bool>();
             int i = 1;
             double checker = 0;
-            Canidate candidate = new Canidate();
+            Candidate candidate = new Candidate();
             while (candidates.ContainsKey(i))
             {
                 candidates.TryGetValue(i, out candidate);
