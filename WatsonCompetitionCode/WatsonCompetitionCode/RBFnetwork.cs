@@ -164,7 +164,7 @@ namespace WatsonCompetitionCode
             writer.Close();
         }
 
-        private float basisFunction(List<double> input, int hidUnNum)
+        private double basisFunction(List<double> input, int hidUnNum)
         {
             double result = 0;
             for (int k = 0; k < input.Count(); k++)
@@ -172,7 +172,7 @@ namespace WatsonCompetitionCode
                 result -= Math.Pow(input[k] - mean[hidUnNum][k], 2) / (2 * Math.Pow(variance[hidUnNum][k], 2));
             }
 
-            return (float)Math.Exp(result);
+            return Math.Exp(result);
         }
 
         private double useSystem(List<double> features)
@@ -242,8 +242,8 @@ namespace WatsonCompetitionCode
                         {
                             for (int j = 0; j < numFeatures; j++)
                             {
-                                dHUdm = ((mean[k][j] - candidate.featuresRating[j]) / (Math.Pow(variance[k][j], 2)));
-                                dHUdv = (Math.Pow(candidate.featuresRating[j] - mean[k][j], 2) / Math.Pow(variance[k][j], 3)); //-1 / variance[k][j];
+                                dHUdm = (candidate.featuresRating[j] - mean[k][j]) / (Math.Pow(variance[k][j], 2));
+                                dHUdv = (Math.Pow(candidate.featuresRating[j] - mean[k][j], 2) / Math.Pow(variance[k][j], 3));
                                 deltaMean[k][j] = learningRate * djdy * weight[k] * BF[k] * dHUdm;
                                 deltaVariance[k][j] = learningRate * djdy * weight[k] * BF[k] * dHUdv;
 
