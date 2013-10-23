@@ -44,7 +44,7 @@ namespace WatsonCompetitionCode
                     LogisiticRegression ai = new LogisiticRegression(dict);
                     ai.train();
                     break;
-                case default:
+                default:
                     Console.WriteLine("Invalid parameters");
                     break;
             }
