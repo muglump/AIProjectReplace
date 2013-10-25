@@ -16,7 +16,7 @@ namespace WatsonCompetitionCode
             List<bool> results = new List<bool>();
             Dictionary<int, Candidate> dict = utility.csvReader(args[1]);
             if (args[2] == "1") utility.removeExtraneousData(dict);
-            //utility.csvWriter("tgmc_cut1.csv", dict);
+            utility.csvWriter("tgmc_cut1.csv", dict);
 
             switch (args[0])
             {
@@ -32,28 +32,34 @@ namespace WatsonCompetitionCode
 
                 case "RBFNetwork":
                     
-                    Dictionary<int, Candidate> newDict = new Dictionary<int, Candidate>();
-                    // dict = utility.csvReader("tgmctrain_small.csv");
-                    // dict = utility.csvReader("tgmc_cut1.csv");
-                    dict = utility.csvReader("tgmc_cut2.csv");
+                    Dictionary<int, Candidate> trainDict = new Dictionary<int, Candidate>();
+                    Dictionary<int, Candidate> testDict = new Dictionary<int, Candidate>();
+                    //testDict = utility.csvReader("tgmctrain_small.csv");
+                    testDict = utility.csvReader("tgmc_cut1.csv");
+                    //testDict = utility.csvReader("tgmc_cut2.csv");
+                    //trainDict = utility.csvReader("tgmctrain_small.csv");
+                    // trainDict = utility.csvReader("tgmc_cut1.csv");
+                    //trainDict = utility.csvReader("tgmc_cut2.csv");
+                    //trainDict = testDict;
 
-                    Candidate cand = new Candidate();
-                    dict.TryGetValue(5, out cand);
-                    RBFnetwork rbf = new RBFnetwork(50, cand.featuresRating.Count(), 0.05);
+                    utility.dataAnalysis(testDict, true);
+                    //utility.removeMore(testDict, "BestFeatures.txt");
+                    //utility.csvWriter("tgmc_cut2.csv",trainDict);
+                    //trainDict = utility.randSample(testDict, 1);
+                    //utility.csvWriter("tgmc_cut3.csv",trainDict);
 
-                    //utility.dataAnalysis(dict);
+                    //Candidate cand = new Candidate();
+                    //trainDict.TryGetValue(1, out cand);
+                    //StatisticalData sd = utility.dataAnalysis(trainDict, true);
+                    //StatisticalData sd = utility.dataAnalysis(trainDict, false);
+                    //RBFnetwork rbf = new RBFnetwork(100, cand.featuresRating.Count(), 0.02, sd, trainDict, true);
 
-                    //utility.removeMore(dict, "BestFeatures.txt");
-                    //newDict = utility.randSample(dict, 1);
-                    //utility.csvWriter("tgmc_cut2.csv",newDict);
-
-                    newDict = dict;
-                    rbf.trainSystem(newDict);
+                    //rbf.trainSystem(trainDict);
                     //rbf.RBFwriter("weights.txt");
-                    //results = rbf.testSystem(dict);
+                    //results = rbf.testSystem(testDict);
 
                     //rbf.RBFreader("weights.txt");
-                    //results = rbf.testSystem(dict);
+                    //results = rbf.testSystem(testDict);
 
                     break;
 
@@ -66,12 +72,15 @@ namespace WatsonCompetitionCode
                     break;
             }
 
+            /*
             for (int k = 0; k < dict.Count(); k++)
             {
                 results.Add(false);
             }
+            */
+
             Console.ReadLine();
-            //utility.fileWriter(results, dict, "output.txt");
+            utility.fileWriter(results, dict, "output.txt");
         }
 
        
@@ -90,6 +99,40 @@ namespace WatsonCompetitionCode
             questionNumber = 0;
             featuresRating = new List<double>();
             isTrue = false;
+        }
+    }
+
+    class StatisticalData
+    {
+        public List<double> meansT;
+        public List<double> variancesT;
+        public List<int> numTzero;
+        public List<int> numTrue;
+        public List<double> meansF;
+        public List<double> variancesF;
+        public List<int> numFzero;
+        public List<int> numFalse;
+
+        public List<double> meansTwz;
+        public List<double> variancesTwz;
+        public List<double> meansFwz;
+        public List<double> variancesFwz;
+
+        public StatisticalData()
+        {
+            meansT = new List<double>();
+            variancesT = new List<double>();
+            numTzero = new List<int>();
+            numTrue = new List<int>();
+            meansF = new List<double>();
+            variancesF = new List<double>();
+            numFzero = new List<int>();
+            numFalse = new List<int>();
+
+            meansTwz = new List<double>();
+            variancesTwz = new List<double>();
+            meansFwz = new List<double>();
+            variancesFwz = new List<double>();
         }
     }
 
@@ -366,14 +409,20 @@ namespace WatsonCompetitionCode
             return final;
         }
 
-        public void dataAnalysis(Dictionary<int, Candidate> candidates)
+        public StatisticalData dataAnalysis(Dictionary<int, Candidate> candidates, bool print)
         {
             List<double> meanT = new List<double>();
             List<double> standDevT = new List<double>();
-            int numTrue = 0;
+            List<int> numTrue = new List<int>();
+            List<int> numTzero = new List<int>();
             List<double> meanF = new List<double>();
             List<double> standDevF = new List<double>();
-            int numFalse = 0;
+            List<int> numFalse = new List<int>();
+            List<int> numFzero = new List<int>();
+            List<double> meanTwz = new List<double>();
+            List<double> standDevTwz = new List<double>();
+            List<double> meanFwz = new List<double>();
+            List<double> standDevFwz = new List<double>();
             Candidate candidate = new Candidate();
 
             //intialize size of array of columns
@@ -384,8 +433,16 @@ namespace WatsonCompetitionCode
                 columns.Add(new List<double>());
                 meanT.Add(0);
                 standDevT.Add(0);
+                numTrue.Add(0);
+                numTzero.Add(0);
                 meanF.Add(0);
                 standDevF.Add(0);
+                numFalse.Add(0);
+                numFzero.Add(0);
+                meanTwz.Add(0);
+                standDevTwz.Add(0);
+                meanFwz.Add(0);
+                standDevFwz.Add(0);
             }
 
             //Generate Array of Columns
@@ -410,12 +467,14 @@ namespace WatsonCompetitionCode
                     candidates.TryGetValue(j, out candidate);
                     if (candidate.isTrue)
                     {
-                        if (i == 0) numTrue++;
+                        if (columns[i][j - 1] != 0) numTrue[i]++;
+                        else numTzero[i]++;
                         meanT[i] += columns[i][j - 1];
                     }
                     else
                     {
-                        if (i == 0) numFalse++;
+                        if (columns[i][j - 1] != 0) numFalse[i]++;
+                        else numFzero[i]++;
                         meanF[i] += columns[i][j - 1];
                     }
                     j++;
@@ -424,8 +483,10 @@ namespace WatsonCompetitionCode
 
             for (int i = 0; i < length; i++)
             {
-                meanF[i] /= numFalse;
-                meanT[i] /= numTrue;
+                meanFwz[i] = meanF[i] / (numFalse[i] + numFzero[i]);
+                meanTwz[i] = meanT[i] / (numTrue[i] + numTzero[i]);
+                if(numFalse[i] != 0) meanF[i] /= numFalse[i];
+                if(numTrue[i] != 0) meanT[i] /= numTrue[i];
             }
 
             // find standard deviation
@@ -437,12 +498,13 @@ namespace WatsonCompetitionCode
                     candidates.TryGetValue(j, out candidate);
                     if (candidate.isTrue)
                     {
-                        standDevT[i] += Math.Pow(columns[i][j - 1] - meanT[i], 2);
+                        standDevTwz[i] += Math.Pow(columns[i][j - 1] - meanTwz[i], 2);
+                        if(columns[i][j - 1] != 0) standDevT[i] += Math.Pow(columns[i][j - 1] - meanT[i], 2);
                     }
                     else
                     {
-                        numFalse++;
-                        standDevF[i] += Math.Pow(columns[i][j - 1] - meanF[i], 2);
+                        standDevFwz[i] += Math.Pow(columns[i][j - 1] - meanFwz[i], 2);
+                        if(columns[i][j - 1] != 0) standDevF[i] += Math.Pow(columns[i][j - 1] - meanF[i], 2);
                     }
                     j++;
                 }
@@ -450,17 +512,41 @@ namespace WatsonCompetitionCode
 
             for (int i = 0; i < length; i++)
             {
-                standDevF[i] = Math.Sqrt(standDevF[i] / numFalse);
-                standDevT[i] = Math.Sqrt(standDevT[i] / numTrue);
+                standDevFwz[i] = Math.Sqrt(standDevFwz[i] / (numFalse[i] + numFzero[i]));
+                if (numFalse[i] != 0) standDevF[i] = Math.Sqrt(standDevF[i] / numFalse[i]);
+                else standDevF[i] = Math.Sqrt(standDevF[i]);
+
+                standDevTwz[i] = Math.Sqrt(standDevTwz[i] / (numTrue[i] + numTzero[i]));
+                if (numTrue[i] != 0) standDevT[i] = Math.Sqrt(standDevT[i] / numTrue[i]);
+                else standDevT[i] = Math.Sqrt(standDevT[i]);
             }
 
-            File.Delete("meanVStandDev.txt");
-            var writer = new StreamWriter(File.OpenWrite("meanVStandDev.txt"));
-            for (int i = 0; i < length; i++)
+            StatisticalData sd = new StatisticalData();
+            sd.meansF = meanF;
+            sd.meansFwz = meanFwz;
+            sd.meansT = meanT;
+            sd.meansTwz = meanTwz;
+            sd.variancesF = standDevF;
+            sd.variancesFwz = standDevFwz;
+            sd.variancesT = standDevT;
+            sd.variancesTwz = standDevTwz;
+            sd.numTzero = numTzero;
+            sd.numFzero = numFzero;
+            sd.numTrue = numTrue;
+            sd.numFalse = numFalse;
+
+            if (print)
             {
-                writer.WriteLine(meanT[i].ToString() + ',' + standDevT[i].ToString() + ',' + meanF[i].ToString() + ',' + standDevF[i].ToString());
+                File.Delete("meanVStandDev.txt");
+                var writer = new StreamWriter(File.OpenWrite("meanVStandDev.txt"));
+                for (int i = 0; i < length; i++)
+                {
+                    writer.WriteLine(meanT[i].ToString() + ',' + standDevT[i].ToString() + ',' + meanF[i].ToString() + ',' + standDevF[i].ToString() + ',' + meanTwz[i].ToString() + ',' + standDevTwz[i].ToString() + ',' + meanFwz[i].ToString() + ',' + standDevFwz[i].ToString());
+                }
+                writer.Close();
             }
-            writer.Close();
+
+            return sd;
         }
     }
 }

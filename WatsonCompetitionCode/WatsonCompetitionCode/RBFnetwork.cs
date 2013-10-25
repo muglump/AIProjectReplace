@@ -18,7 +18,7 @@ namespace WatsonCompetitionCode
         private List<double> BF;
 
         // Random initialization for means, variances, etc.
-        public RBFnetwork(int numNod, int numFeat, double deltaWeight)
+        public RBFnetwork(int numNod, int numFeat, double deltaWeight, StatisticalData sd, Dictionary<int, Candidate> dict, bool use)
         {
             numNodes = numNod;
             numFeatures = numFeat;
@@ -29,17 +29,64 @@ namespace WatsonCompetitionCode
             weight = new List<double>();
             BF = new List<double>();
             Random random = new Random();
-            for (int k = 0; k < numNodes; k++)
+            Candidate c = new Candidate();
+
+            if (use)
             {
-                mean.Add(new List<double>());
-                variance.Add(new List<double>());
-                for (int j = 0; j < numFeatures; j++)
+                List<int> index = new List<int>();
+                int test = -1;
+                int total = dict.Count();
+                for (int k = 0; k < numNodes; k++)
                 {
-                    mean[k].Add(1.1 * random.NextDouble() - 0.1);
-                    variance[k].Add(random.NextDouble() * 5);
+                    if (test == -1)
+                    {
+                        test = (int)((total / numNodes) * random.NextDouble()) + 1;
+                        index.Add(test);
+                    }
+                    else
+                    {
+                        test = (int)((total / numNodes) * random.NextDouble()) + 1;
+                        index.Add(index[index.Count() - 1] + test);
+                    }
+                    total -= test;  
                 }
-                weight.Add(1);
-                BF.Add(0);
+
+                //double v = 0;
+                for (int k = 0; k < numNodes; k++)
+                {
+                    mean.Add(new List<double>());
+                    variance.Add(new List<double>());
+                    dict.TryGetValue(index[k], out c);
+                    for (int j = 0; j < numFeatures; j++)
+                    {
+                        mean[k].Add(c.featuresRating[j]);
+
+                        //if (c.isTrue) v = Math.Abs(sd.variancesT[j] + 0.2 * (random.NextDouble() - 0.1));
+                        //else v = Math.Abs(sd.variancesF[j] + 0.2 * (random.NextDouble() - 0.1));
+                        //if (v < 0.01) v = 0.01;
+                        //variance[k].Add(v);
+
+                        variance[k].Add(5*random.NextDouble()+0.001);
+                    }
+                    if (c.isTrue) weight.Add(0.7+0.3*random.NextDouble());
+                    else weight.Add(-(0.7+0.3*random.NextDouble()));
+                    BF.Add(0);
+                }
+            }
+            else
+            {
+                for (int k = 0; k < numNodes; k++)
+                {
+                    mean.Add(new List<double>());
+                    variance.Add(new List<double>());
+                    for (int j = 0; j < numFeatures; j++)
+                    {
+                        mean[k].Add(1.1 * random.NextDouble() - 0.1);
+                        variance[k].Add(3 * random.NextDouble() + 0.001);
+                    }
+                    weight.Add(2 * random.NextDouble() - 1);
+                    BF.Add(0);
+                }
             }
         }
 
@@ -182,6 +229,7 @@ namespace WatsonCompetitionCode
             for (int k = 0; k < numNodes; k++)
             {
                 bfout = basisFunction(features, k);
+                if (bfout == 0) bfout = 0.01;
                 BF[k] = bfout;
                 output += bfout * weight[k];
             }
@@ -195,11 +243,11 @@ namespace WatsonCompetitionCode
             List<List<double>> deltaMean = new List<List<double>>();
             List<List<double>> deltaVariance = new List<List<double>>();
             List<double> deltaWeight = new List<double>();
+            List<double> checker = new List<double>();
+            List<double> candCheck = new List<double>();
             int i = 0;
-            double checker = 0;
-            float candCheck = 0;
             Candidate candidate = new Candidate();
-            int djdy = -1;
+            double djdy = -1;
             double dHUdm = 1;
             double dHUdv = 1;
             int numOffT = 1;
@@ -217,7 +265,22 @@ namespace WatsonCompetitionCode
                 deltaWeight.Add(0);
             }
 
+            i = 1;
+            while (candidates.ContainsKey(i))
+            {
+                candidates.TryGetValue(i, out candidate);
+                checker.Add(0);
+                if (candidate.isTrue) candCheck.Add(1);
+                else candCheck.Add(-1);
+                i++;
+            }
+
             // learning
+            int totalWrong = 0;
+            int totalRight = 0;
+            bool doChange = false;
+            double checkRate = 0.8; // max of 1
+            int count = 0;
             while (numOffT != 0 || numOffF != 0)
             {
                 numOffT = 0;
@@ -226,17 +289,23 @@ namespace WatsonCompetitionCode
                 while (candidates.ContainsKey(i))
                 {
                     candidates.TryGetValue(i, out candidate);
-                    checker = useSystem(candidate.featuresRating);
-                    if (candidate.isTrue) candCheck = 1;
-                    else candCheck = 0;
-
-                    if (Math.Abs(checker - candCheck) >= 0.1)
+                    checker[i-1] = useSystem(candidate.featuresRating);
+                    if (candidate.isTrue)
                     {
-                        if (candCheck == 1) numOffT++;
-                        else numOffF++;
+                        if (checker[i - 1] < (candCheck[i - 1] - checkRate)) doChange = true;
+                        else doChange = false;
+                    }
+                    else
+                    {
+                        if (checker[i - 1] > (candCheck[i-1] + checkRate)) doChange = true;
+                        else doChange = false;
+                    }
 
-                        if (checker > candCheck) djdy = -1;
-                        else djdy = 1;
+                    if (doChange)
+                    {
+                        if (candCheck[i - 1] == 1) numOffT++;
+                        else numOffF++;
+                        djdy = candCheck[i - 1] - checker[i - 1];
 
                         for (int k = 0; k < numNodes; k++)
                         {
@@ -270,6 +339,18 @@ namespace WatsonCompetitionCode
                         weight[k] += deltaWeight[k];
                     }
                 }
+                totalWrong = numOffT + numOffF;
+                totalRight = candidates.Count() - totalWrong;
+                count++;
+                Console.WriteLine(count + ": !T=" + numOffT + ", !F=" + numOffF + ", C=" + totalRight + ", Lr=" + learningRate + ", T=" + checkRate);
+
+                if (learningRate > 0.015) learningRate -= 0.01;
+                else if (learningRate > 0.0025) learningRate -= 0.002;
+                else if (learningRate > 0.00025) learningRate -= .0001;
+
+                if (checkRate > 0.4) checkRate -= 0.05;
+                else if (checkRate > 0.2) checkRate -= 0.02;
+                else if (checkRate > 0.1) checkRate -= 0.01;
             }
             Console.WriteLine("I'm done training!\n");
         }
@@ -285,7 +366,7 @@ namespace WatsonCompetitionCode
                 candidates.TryGetValue(i, out candidate);
                 checker = useSystem(candidate.featuresRating);
 
-                if (checker >= 0.7) results.Add(true);
+                if (checker >= 0.5) results.Add(true);
                 else results.Add(false);
 
                 i++;
