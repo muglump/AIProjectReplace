@@ -13,7 +13,7 @@ namespace WatsonCompetitionCode
 
     public class LogisiticRegression
     {
-        private Dictionary<int, Canidate> trainingDataSet;
+        private Dictionary<int, Candidate> trainingDataSet;
         public DenseVector theta;
         private DenseVector J;
         private DenseMatrix x;
@@ -31,7 +31,7 @@ namespace WatsonCompetitionCode
         }
 
 
-        public LogisiticRegression(Dictionary<int, Canidate> data)
+        public LogisiticRegression(Dictionary<int, Candidate> data)
         {
             this.trainingDataSet = data;
             int numberFeatures = trainingDataSet[15].featuresRating.Count;
@@ -46,12 +46,12 @@ namespace WatsonCompetitionCode
             List<double> ydata = new List<double>();
 
             //fill x and y data from dictionary
-            foreach (KeyValuePair<int, Canidate> canidate in trainingDataSet)
+            foreach (KeyValuePair<int, Candidate> Candidate in trainingDataSet)
             {
-                List<double> intermediate = canidate.Value.featuresRating.ToList();
+                List<double> intermediate = Candidate.Value.featuresRating.ToList();
                 intermediate.Insert(0, 1);
                 xdata[k] = new DenseVector(intermediate.ToArray());
-                if (canidate.Value.isTrue) ydata.Add(1);
+                if (Candidate.Value.isTrue) ydata.Add(1);
                 else ydata.Add(0);
                 k++;
             }

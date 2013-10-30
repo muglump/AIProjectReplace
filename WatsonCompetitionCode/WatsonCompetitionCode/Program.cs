@@ -64,8 +64,10 @@ namespace WatsonCompetitionCode
                     break;
 
                 case "LogisticRegression":
+
                     LogisiticRegression ai = new LogisiticRegression(dict);
                     ai.train();
+
                     break;
                 default:
                     Console.WriteLine("Invalid parameters");
@@ -224,7 +226,7 @@ namespace WatsonCompetitionCode
             writer.Close();
         }
 
-        public List<int> removeExtraneousData(Dictionary<int, Candidate> candidates)
+        public List<int> removeExtraneousData(Dictionary<int, Candidate> candidates,bool normalize = true)
         {
             //intialize size of array of columns
             List<List<double>> columns = new List<List<double>>();
@@ -301,24 +303,26 @@ namespace WatsonCompetitionCode
                 removeData.Remove(removeData.Max());
             }
 
-            List<double> maxValues = new List<double>();
-            foreach (List<double> column in columns)
+            if (normalize)
             {
-                double absMax;
-                if (Math.Abs(column.Min()) > Math.Abs(column.Max())) absMax = Math.Abs(column.Min());
-                else absMax = Math.Abs(column.Max());
-                if (absMax == 0.0) absMax = (double)1.0;
-                maxValues.Add(absMax);
-            }
-
-            for (int k = 0; k < maxValues.Count; k++)
-            {
-                foreach (KeyValuePair<int, Candidate> candidate in candidates)
+                List<double> maxValues = new List<double>();
+                foreach (List<double> column in columns)
                 {
-                    candidate.Value.featuresRating[k] = (candidate.Value.featuresRating[k] / maxValues[k]);
+                    double absMax;
+                    if (Math.Abs(column.Min()) > Math.Abs(column.Max())) absMax = Math.Abs(column.Min());
+                    else absMax = Math.Abs(column.Max());
+                    if (absMax == 0.0) absMax = (double)1.0;
+                    maxValues.Add(absMax);
+                }
+
+                for (int k = 0; k < maxValues.Count; k++)
+                {
+                    foreach (KeyValuePair<int, Candidate> candidate in candidates)
+                    {
+                        candidate.Value.featuresRating[k] = (candidate.Value.featuresRating[k] / maxValues[k]);
+                    }
                 }
             }
-
             return result;
         }
 
