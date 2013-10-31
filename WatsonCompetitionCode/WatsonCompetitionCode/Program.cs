@@ -11,17 +11,22 @@ namespace WatsonCompetitionCode
     {
         static void Main(string[] args)
         {
-            if (args.Count() < 3) Console.WriteLine("Provide (1) Machine learning technique, (2) data file, (3) '1' to remove extraneous data");
+            if (args.Count() < 3) Console.WriteLine("Provide (1) Machine learning technique, (2) data file, (3) '1' to remove extraneous data, (4) '0' to not normalize data on removal");
             Util utility = new Util();
+            Dictionary<int, Candidate> dict = new Dictionary<int, Candidate>();
             List<bool> results = new List<bool>();
-            Dictionary<int, Candidate> dict = utility.csvReader(args[1]);
-            if (args[2] == "1") utility.removeExtraneousData(dict);
-            utility.csvWriter("tgmc_cut1.csv", dict);
+            bool normalize = true;
+            if (args[3] == "0") normalize = false;
 
             switch (args[0])
             {
                 case "Tree":
                     
+                    dict = utility.csvReader(args[1]);
+
+                    if (args[2] == "1") utility.removeExtraneousData(dict, normalize);
+                    //utility.csvWriter("tgmc_cut1.csv", dict);
+
                     Console.Write("Starting Tree Building");
                     DecisionTrees tree = new DecisionTrees(dict, 20);
                     Console.Write("Built Tree");
@@ -32,6 +37,12 @@ namespace WatsonCompetitionCode
 
                 case "RBFNetwork":
                     
+                    
+                    dict = utility.csvReader(args[1]);
+
+                    if (args[2] == "1") utility.removeExtraneousData(dict, normalize);
+                    //utility.csvWriter("tgmc_cut1.csv", dict);
+
                     Dictionary<int, Candidate> trainDict = new Dictionary<int, Candidate>();
                     Dictionary<int, Candidate> testDict = new Dictionary<int, Candidate>();
                     //testDict = utility.csvReader("tgmctrain_small.csv");
@@ -64,9 +75,54 @@ namespace WatsonCompetitionCode
                     break;
 
                 case "LogisticRegression":
+                    bool train = true;
+                    if (train)
+                    {
+                        Dictionary<int,Candidate> FullSet = utility.csvReader(args[1]);
+                        Console.WriteLine("read file");
+                        int sizeOfTrain = 2000;
+                        int numTrue=0;
+                        int numFalse=0;
+                        int ratioTtoF = 1;                    
+                        Random gen = new Random();
+                        foreach (KeyValuePair<int,Candidate> pair in FullSet)
+                        {
+                                                  
+                           if (pair.Value.isTrue && numTrue < (sizeOfTrain / 2))
+                                {
+                                    dict.Add(dict.Count + 1, pair.Value);
+                                    numTrue++;
+                                }
+                           else if (!pair.Value.isTrue && numFalse < (sizeOfTrain / 2))
+                                {
+                                    dict.Add(dict.Count + 1, pair.Value);
+                                    numFalse++;
+                                }
+                           
+                        }
+                        utility.csvWriter("randomSplit.csv", dict);
+                        LogisiticRegression ai = new LogisiticRegression(dict);
+                        Console.Write("Beginning Training \n");
+                        ai.train();
+                        ai.writeToFile();
+                        Console.Write("Finished Training \n");
+                        Console.Write("AI Convergence is " + ai.convergenceValue().ToString());
 
-                    LogisiticRegression ai = new LogisiticRegression(dict);
-                    ai.train();
+                        System.IO.StreamWriter writer1 = new StreamWriter("convergenceValues.csv");
+                        for (int k = 1; k <= ai.convergenceValue().Count; k++)
+                        {
+                            StringBuilder s = new StringBuilder();
+                            s.Append(k + ",");
+                            s.Append(ai.convergenceValue().ToList()[k - 1]);
+                            if (k != ai.convergenceValue().Count) writer1.WriteLine(s.ToString());
+                            else writer1.Write(s.ToString());
+                        }
+                        writer1.Close();
+                    }
+                    else
+                    {
+                        LogisiticRegression ai = new LogisiticRegression("LogisticTrainSmall.txt");
+                    }
 
                     break;
                 default:
@@ -326,7 +382,21 @@ namespace WatsonCompetitionCode
             return result;
         }
 
-        public void removeMore(Dictionary<int, Candidate> candidates, string fileName)
+        public void removeMore(Dictionary<int, Candidate> canidates, List<int> rmColumns)
+        {
+            List<int> removeData = rmColumns.ToList();
+            while (removeData.Count > 0)
+            {
+                foreach (KeyValuePair<int, Candidate> pair in canidates)
+                {
+                    pair.Value.featuresRating.RemoveAt(removeData.Max());
+                }
+                //columns.RemoveAt(removeData.Max());
+                //Console.WriteLine("Removed Column " + removeData.Max());
+                removeData.Remove(removeData.Max());
+            }
+        }
+        public void removeMore(Dictionary<int, Candidate> canidates, string fileName)
         {
             // Assumes file is 1 indexed (like Matlab)
             var reader = new StreamReader(File.OpenRead(@fileName));
@@ -335,50 +405,20 @@ namespace WatsonCompetitionCode
             List<int> keepIndex = new List<int>();
             foreach (string val in values)
             {
-                keepIndex.Add(Convert.ToInt32(val));
+                keepIndex.Add(Convert.ToInt32(val) - 1);
             }
             reader.Close();
 
-            //intialize size of array of columns
-            List<List<double>> columns = new List<List<double>>();
-            int columnCount = candidates.Values.First().featuresRating.Count();
-            for (int k = 0; k < columnCount; k++)
+            List<int> removeIndex = new List<int>();
+            for (int k = 0; k < canidates.First().Value.featuresRating.Count; k++)
             {
-                columns.Add(new List<double>());
+                removeIndex.Add(k);
             }
-
-            //Generate Array of Columns
-            foreach (KeyValuePair<int, Candidate> pair in candidates)
+            foreach (int index in keepIndex)
             {
-                Candidate c = pair.Value;
-                int length = c.featuresRating.Count;
-                for (int i = 0; i < length; i++)
-                {
-                    columns[i].Add(c.featuresRating[i]);
-                }
+                removeIndex.Remove(index);
             }
-
-            //Add columns to remove that contain same data
-            List<int> removeData = new List<int>();
-            for (int k = 0; k < columnCount - 1; k++)
-            {
-                if (!keepIndex.Contains(k + 1))
-                {
-                    removeData.Add(k);
-                }
-            }
-
-            List<int> result = removeData.ToList();
-            while (removeData.Count > 0)
-            {
-                foreach (KeyValuePair<int, Candidate> pair in candidates)
-                {
-                    pair.Value.featuresRating.RemoveAt(removeData.Max());
-                }
-                columns.RemoveAt(removeData.Max());
-                //Console.WriteLine("Removed Column " + removeData.Max());
-                removeData.Remove(removeData.Max());
-            }
+            removeMore(canidates, removeIndex);
         }
 
         public Dictionary<int, Candidate> randSample(Dictionary<int, Candidate> candidates, int FperT)

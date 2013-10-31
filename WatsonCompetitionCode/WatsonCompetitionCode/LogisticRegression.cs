@@ -11,7 +11,7 @@ using MathNet.Numerics.LinearAlgebra.Double;
 namespace WatsonCompetitionCode
 {
 
-    public class LogisiticRegression
+    class LogisiticRegression
     {
         private Dictionary<int, Candidate> trainingDataSet;
         public DenseVector theta;
@@ -33,8 +33,9 @@ namespace WatsonCompetitionCode
 
         public LogisiticRegression(Dictionary<int, Candidate> data)
         {
+            DenseMatrix testMat = new DenseMatrix(50000, 318, 2.0);
             this.trainingDataSet = data;
-            int numberFeatures = trainingDataSet[15].featuresRating.Count;
+            int numberFeatures = trainingDataSet.Values.First().featuresRating.Count();
 
             //Initialize xdata matrix
             DenseVector[] xdata;
@@ -66,7 +67,7 @@ namespace WatsonCompetitionCode
             //Intialize fitting parameters, theta
             theta = new DenseVector(n + 1, 0);
 
-            this.writeToFile();
+           // this.writeToFile();
         }
 
         //Creates an AI That only has Theta, cannon train or anything.
