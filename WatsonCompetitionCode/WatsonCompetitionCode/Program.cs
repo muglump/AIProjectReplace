@@ -76,39 +76,62 @@ namespace WatsonCompetitionCode
 
                 case "LogisticRegression":
                     bool train = true;
+                    LogisiticRegression ai = null;
+                    List<int> removed = null;
+
                     if (train)
                     {
-                        Dictionary<int,Candidate> FullSet = utility.csvReader(args[1]);
+                        Console.WriteLine("reading file");
+                        Dictionary<int, Candidate> FullSet = utility.csvReader("tgmctrain.csv");
                         Console.WriteLine("read file");
-                        int sizeOfTrain = 2000;
-                        int numTrue=0;
-                        int numFalse=0;
-                        int ratioTtoF = 1;                    
-                        Random gen = new Random();
-                        foreach (KeyValuePair<int,Candidate> pair in FullSet)
+                        while (true)
                         {
-                                                  
-                           if (pair.Value.isTrue && numTrue < (sizeOfTrain / 2))
+                            if (true)
+                            {
+                                
+                                int sizeOfTrain = 10000;
+                                int numTrue = 0;
+                                int numFalse = 0;
+                                int ratioTtoF = 1;
+                                Random gen = new Random();
+                                while (dict.Count < sizeOfTrain)
                                 {
-                                    dict.Add(dict.Count + 1, pair.Value);
-                                    numTrue++;
+                                    int rand = gen.Next(FullSet.Count);
+                                    while (rand == 0) rand = gen.Next(FullSet.Count);
+                                    if (!dict.ContainsValue(FullSet[rand]))
+                                    {
+                                        if (FullSet[rand].isTrue && numTrue < (1000))
+                                        {
+                                            dict.Add(dict.Count + 1, FullSet[rand]);
+                                            numTrue++;
+                                        }
+                                        else if (!FullSet[rand].isTrue && numFalse < (9000))
+                                        {
+                                            dict.Add(dict.Count + 1, FullSet[rand]);
+                                            numFalse++;
+                                        }
+                                    }
+
                                 }
-                           else if (!pair.Value.isTrue && numFalse < (sizeOfTrain / 2))
-                                {
-                                    dict.Add(dict.Count + 1, pair.Value);
-                                    numFalse++;
-                                }
-                           
+                            }
+                            utility.csvWriter("randomSplitLarger.csv", dict);
                         }
-                        utility.csvWriter("randomSplit.csv", dict);
-                        LogisiticRegression ai = new LogisiticRegression(dict);
+                        Console.WriteLine("reading file");
+                        dict = utility.csvReader("randomSplitLarge.csv");
+                        Console.WriteLine("remove extraneous");
+                        removed =utility.removeExtraneousData(dict, false);
+
+                        utility.writeRemovedValues("removedLarge5k.txt", removed);
+                        //removed = utility.readRemovedValues("removedLarge10k.txt");
+
+                        ai = new LogisiticRegression(dict);
                         Console.Write("Beginning Training \n");
                         ai.train();
-                        ai.writeToFile();
+                        ai.writeToFile("LG5kDataAI.txt");
                         Console.Write("Finished Training \n");
                         Console.Write("AI Convergence is " + ai.convergenceValue().ToString());
 
-                        System.IO.StreamWriter writer1 = new StreamWriter("convergenceValues.csv");
+                        System.IO.StreamWriter writer1 = new StreamWriter("convergenceValues5k.csv");
                         for (int k = 1; k <= ai.convergenceValue().Count; k++)
                         {
                             StringBuilder s = new StringBuilder();
@@ -121,8 +144,274 @@ namespace WatsonCompetitionCode
                     }
                     else
                     {
-                        LogisiticRegression ai = new LogisiticRegression("LogisticTrainSmall.txt");
+                        //dict = utility.csvReader("randomSplitLarge.csv");
+                        //removed = utility.removeExtraneousData(dict, false);
+                        ai = new LogisiticRegression("LG5kDataAI.txt");
+                        
                     }
+                    
+                        double confidence = 0.99;
+                        int testMode = 5;
+                        switch (testMode)
+                        {
+                            case 1:
+                                int numActualTrue = 0;
+                                int numCorrectlyTrue = 0;
+                                int numFalsePositive = 0;
+                                int numActualFalse = 0;
+                                int numFalseNegative = 0;
+                                int numCorrectFalse = 0;
+                                
+                                foreach (KeyValuePair<int, Candidate> pair in dict)
+                                {
+                                    double prob = ai.probability(pair.Value.featuresRating);
+                                    bool guess = (prob > confidence);
+                                    if (guess)
+                                    {
+                                        if (pair.Value.isTrue)
+                                        {
+                                            numActualTrue++;
+                                            numCorrectlyTrue++;
+                                        }
+                                        else
+                                        {
+                                            numActualFalse++;
+                                            numFalsePositive++;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (pair.Value.isTrue)
+                                        {
+                                            numActualTrue++;
+                                            numFalseNegative++;
+                                        }
+                                        else
+                                        {
+                                            numActualFalse++;
+                                            numCorrectFalse++;
+                                        }
+                                    }
+                                }
+                                Console.WriteLine("Total actual trues: " + numActualTrue);
+                                Console.WriteLine("Total actual falses: " + numActualFalse);
+                                Console.WriteLine("Total correct trues: " + numCorrectlyTrue);
+                                Console.WriteLine("Total false postives: " + numFalsePositive);
+                                Console.WriteLine("Total correct falses: " + numCorrectFalse);
+                                Console.WriteLine("Total false negatives: " + numFalseNegative);
+                                break;
+                            case 2:
+                                numActualTrue = 0;
+                                numCorrectlyTrue = 0;
+                                numFalsePositive = 0;
+                                numActualFalse = 0;
+                                numFalseNegative = 0;
+                                numCorrectFalse = 0;
+                                
+                                Console.WriteLine("Reading File");
+                                Dictionary<int, Candidate> largeSet = utility.csvReader("tgmctrain.csv");
+                                Console.WriteLine("removing extraneous");
+                                removed = utility.readRemovedValues("removedLarge10k.txt");
+                                utility.removeMore(largeSet, removed);
+                                /* Console.WriteLine("Writing new file");
+                                 utility.csvWriter("tgmctrainFilteredLarge.csv", largeSet);*/
+                                foreach (KeyValuePair<int, Candidate> pair in largeSet)
+                                {
+                                    double prob = ai.probability(pair.Value.featuresRating);
+                                    bool guess = (prob > confidence);
+                                    if (guess)
+                                    {
+                                        if (pair.Value.isTrue)
+                                        {
+                                            numActualTrue++;
+                                            numCorrectlyTrue++;
+                                        }
+                                        else
+                                        {
+                                            numActualFalse++;
+                                            numFalsePositive++;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (pair.Value.isTrue)
+                                        {
+                                            numActualTrue++;
+                                            numFalseNegative++;
+                                        }
+                                        else
+                                        {
+                                            numActualFalse++;
+                                            numCorrectFalse++;
+                                        }
+                                    }
+                                }
+                                Console.WriteLine("Total actual trues: " + numActualTrue);
+                                Console.WriteLine("Total actual falses: " + numActualFalse);
+                                Console.WriteLine("Total correct trues: " + numCorrectlyTrue);
+                                Console.WriteLine("Total false postives: " + numFalsePositive);
+                                Console.WriteLine("Total correct falses: " + numCorrectFalse);
+                                Console.WriteLine("Total false negatives: " + numFalseNegative);
+                                break;
+                            case 3:
+                                                                
+                                List<bool> answer = new List<bool>();
+                                Console.WriteLine("Reading File");
+                                Dictionary<int, Candidate> newSet = utility.csvReader("tgmcevaluation.csv");
+                                removed = utility.readRemovedValues("removedLarge5k.txt");
+                                utility.removeMore(newSet, removed);
+                                //Console.WriteLine("removing extraneous");
+                                //utility.removeMore(largeSet, removed);
+                                //Console.WriteLine("Writing new file");
+                                //utility.csvWriter("tgmctrainFiltered.csv", largeSet);
+                                while (true)
+                                {
+                                    confidence = 0.99;
+                                    Console.WriteLine("Evaluating at Confidence: " + confidence);
+                                    foreach (KeyValuePair<int, Candidate> pair in newSet)
+                                    {
+                                        double prob = ai.probability(pair.Value.featuresRating);
+                                        bool guess = (prob > confidence);
+                                        answer.Add(guess);
+
+                                    }
+                                    /* Console.WriteLine("Total actual trues: " + numActualTrue);
+                                     Console.WriteLine("Total actual falses: " + numActualFalse);
+                                     Console.WriteLine("Total correct trues: " + numCorrectlyTrue);
+                                     Console.WriteLine("Total false postives: " + numFalsePositive);
+                                     Console.WriteLine("Total correct falses: " + numCorrectFalse);
+                                     Console.WriteLine("Total false negatives: " + numFalseNegative);*/
+                                    Console.WriteLine("Finished");
+                                    utility.fileWriter(answer, newSet, "LogisticRegressionTestAnswer5k.txt");
+                                }
+                                break;
+                            case 4:
+                                LogisiticRegression ai5k = new LogisiticRegression("LogisticRegressionAiBackup20131031.txt");
+                                LogisiticRegression ai10k = new LogisiticRegression("LG10kDataAI.txt");
+                                LogisiticRegression ai20k = new LogisiticRegression("LG20kDataAI.txt");
+                                
+                                numActualTrue = 0;
+                                numCorrectlyTrue = 0;
+                                numFalsePositive = 0;
+                                numActualFalse = 0;
+                                numFalseNegative = 0;
+                                numCorrectFalse = 0;
+                                
+                                Console.WriteLine("Reading File");
+                                Dictionary<int, Candidate> trainingSet = utility.csvReader("tgmctrain.csv");
+                                Console.WriteLine("removing extraneous");
+                                removed = utility.readRemovedValues("removedLarge10k.txt");
+                                utility.removeMore(trainingSet, removed);
+                                /* Console.WriteLine("Writing new file");
+                                 utility.csvWriter("tgmctrainFilteredLarge.csv", largeSet);*/
+                                while (true)
+                                {
+                                    confidence = 0.9;
+                                    numActualTrue = 0;
+                                    numCorrectlyTrue = 0;
+                                    numFalsePositive = 0;
+                                    numActualFalse = 0;
+                                    numFalseNegative = 0;
+                                    numCorrectFalse = 0;
+                                    foreach (KeyValuePair<int, Candidate> pair in trainingSet)
+                                    {
+                                        double prob5k = ai5k.probability(pair.Value.featuresRating);
+                                        double prob10k = ai10k.probability(pair.Value.featuresRating);
+                                        double prob20k = ai20k.probability(pair.Value.featuresRating);
+
+                                        bool guess1 = (prob5k > confidence);
+                                        bool guess2 = (prob10k > confidence);
+                                        bool guess3 = (prob20k > confidence);
+
+
+
+                                        if (guess1 && guess3)
+                                        {
+                                            if (pair.Value.isTrue)
+                                            {
+                                                numActualTrue++;
+                                                numCorrectlyTrue++;
+                                            }
+                                            else
+                                            {
+                                                numActualFalse++;
+                                                numFalsePositive++;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if (pair.Value.isTrue)
+                                            {
+                                                numActualTrue++;
+                                                numFalseNegative++;
+                                            }
+                                            else
+                                            {
+                                                numActualFalse++;
+                                                numCorrectFalse++;
+                                            }
+                                        }
+                                    }
+                                    Console.WriteLine("Total actual trues: " + numActualTrue);
+                                    Console.WriteLine("Total actual falses: " + numActualFalse);
+                                    Console.WriteLine("Total correct trues: " + numCorrectlyTrue);
+                                    Console.WriteLine("Total false postives: " + numFalsePositive);
+                                    Console.WriteLine("Total correct falses: " + numCorrectFalse);
+                                    Console.WriteLine("Total false negatives: " + numFalseNegative);
+                                }
+                                break;
+                            case 5:
+                                LogisiticRegression ai5k1 = new LogisiticRegression("LogisticRegressionAiBackup20131031.txt");
+                                LogisiticRegression ai10k1 = new LogisiticRegression("LG10kDataAI.txt");
+                                LogisiticRegression ai20k1 = new LogisiticRegression("LG20kDataAI.txt");
+                                List<bool> answer1 = new List<bool>();
+                                Console.WriteLine("Reading File");
+                                Dictionary<int, Candidate> newSet1 = utility.csvReader("tgmcevaluation.csv");
+                                removed = utility.readRemovedValues("removedLarge5k.txt");
+                                utility.removeMore(newSet1, removed);
+                                //Console.WriteLine("removing extraneous");
+                                //utility.removeMore(largeSet, removed);
+                                //Console.WriteLine("Writing new file");
+                                //utility.csvWriter("tgmctrainFiltered.csv", largeSet);
+                                while (true)
+                                {
+                                    confidence = 0.9;
+                                    answer1 = new List<bool>();
+                                    Console.WriteLine("Evaluating at Confidence: " + confidence);
+                                    foreach (KeyValuePair<int, Candidate> pair in newSet1)
+                                    {
+
+                                        double prob1 = ai5k1.probability(pair.Value.featuresRating);
+                                        double prob2 = ai10k1.probability(pair.Value.featuresRating);
+                                        double prob3 = ai20k1.probability(pair.Value.featuresRating);
+
+                                        bool guess11 = (prob1 > confidence);
+                                        bool guess12 = (prob2 > confidence);
+                                        bool guess13 = (prob3 > confidence);
+                                        answer1.Add(guess11 || guess13);
+
+                                    }
+                                    /* Console.WriteLine("Total actual trues: " + numActualTrue);
+                                     Console.WriteLine("Total actual falses: " + numActualFalse);
+                                     Console.WriteLine("Total correct trues: " + numCorrectlyTrue);
+                                     Console.WriteLine("Total false postives: " + numFalsePositive);
+                                     Console.WriteLine("Total correct falses: " + numCorrectFalse);
+                                     Console.WriteLine("Total false negatives: " + numFalseNegative);*/
+                                    Console.WriteLine("Finished");
+                                    utility.fileWriter(answer1, newSet1, "LogisticRegressionTestAnswerMulti.txt");
+                                }
+
+    
+                            default:
+                                Console.WriteLine("Invalid Test");
+                                break;
+                        }
+
+                    
+
+                    break;
+                //Case for combined work TODO:
+                case "Combined":
 
                     break;
                 default:
@@ -138,7 +427,7 @@ namespace WatsonCompetitionCode
             */
 
             Console.ReadLine();
-            utility.fileWriter(results, dict, "output.txt");
+            //utility.fileWriter(results, dict, "output.txt");
         }
 
        
@@ -269,13 +558,13 @@ namespace WatsonCompetitionCode
                 stringToWrite = candidate.rowNumber.ToString();
                 if (results[i - 1] == true)
                 {
-                    if (candidate.isTrue == true) writer.WriteLine(stringToWrite);
-                    else writer.WriteLine(f + stringToWrite);
-                    // writer.WriteLine(stringToWrite);
+                    //if (candidate.isTrue == true) writer.WriteLine(stringToWrite);
+                    //else writer.WriteLine(f + stringToWrite);
+                    writer.WriteLine(stringToWrite);
                 }
                 else // for debuging only (remove for final program)
                 {
-                    if (candidate.isTrue == true) writer.WriteLine(t + stringToWrite);
+                    //if (candidate.isTrue == true) writer.WriteLine(t + stringToWrite);
                 }
                 i++;
             }
@@ -419,6 +708,36 @@ namespace WatsonCompetitionCode
                 removeIndex.Remove(index);
             }
             removeMore(canidates, removeIndex);
+        }
+        public List<int> readRemovedValues(String filepath)
+        {
+            List<int> result = new List<int>();
+            System.IO.StreamReader reader = new System.IO.StreamReader(filepath);
+            String line = reader.ReadLine();
+            String[] values = line.Split(',');
+            foreach (String value in values)
+            {
+                if (value == "") break;
+                result.Add(Convert.ToInt32(value));
+            }
+
+            reader.Close();
+
+            return result;
+            
+        }
+        public void writeRemovedValues(String filepath, List<int> removed)
+        {
+            System.IO.StreamWriter writer1 = new StreamWriter(filepath);
+            StringBuilder s = new StringBuilder();
+            for (int k = 0; k < removed.Count; k++)
+            {
+                if (k != removed.Count - 1) s.Append(removed[k] + ",");
+                else s.Append(removed[k]);
+            }
+            writer1.Write(s.ToString());
+            writer1.Close();
+
         }
 
         public Dictionary<int, Candidate> randSample(Dictionary<int, Candidate> candidates, int FperT)

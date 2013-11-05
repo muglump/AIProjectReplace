@@ -142,16 +142,23 @@ namespace WatsonCompetitionCode
             theta = new DenseVector(n + 1, 0);
             for (int k = 0; k < iterations; k++)
             {
+                Console.WriteLine("Computing z");
                 DenseVector z = x * theta;
+                Console.WriteLine("Computing h");
                 DenseVector h = sigmoid(z);
+                Console.WriteLine("Computing grad");
                 DenseVector grad = gradient(x, h, y);
+                Console.WriteLine("Computing H");
                 DenseMatrix H = hessian(x, h);
 
                 //Calculate J for testing convergence
+                Console.WriteLine("Computing J["+k+"]");
                 J[k] = (double)(y.Negate().PointwiseMultiply((DenseVector)log(h)) - (1 - y).PointwiseMultiply((DenseVector)log((DenseVector)(1 - h)))).Sum() / m;
 
+                Console.WriteLine("Computing theta");
                 //Compute Theta
                 theta = (DenseVector)(theta - H.Inverse() * grad);
+                
 
                 //Check for non invertable Hessian Matrix, if true, re-train with diagonals have slight value added
                 if (Double.IsNaN(theta[0]))
@@ -164,6 +171,9 @@ namespace WatsonCompetitionCode
                     train(iterations);
                     break;
                 }
+                
+                Console.WriteLine("Competed Pass " + k);
+                //if (k >= 2) break;
             }
         }
         private DenseVector log(DenseVector vec)
