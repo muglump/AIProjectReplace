@@ -14,6 +14,9 @@ namespace WatsonCompetitionCode
             if (args.Count() < 3) Console.WriteLine("Provide (1) Machine learning technique, (2) data file, (3) '1' to remove extraneous data, (4) '0' to not normalize data on removal");
             Util utility = new Util();
             Dictionary<int, Candidate> dict = new Dictionary<int, Candidate>();
+            Dictionary<int, Candidate> trainDict = new Dictionary<int, Candidate>();
+            Dictionary<int, Candidate> testDict = new Dictionary<int, Candidate>();
+            FeatureData features = new FeatureData();
             List<bool> results = new List<bool>();
             bool normalize = true;
             if (args[3] == "0") normalize = false;
@@ -35,6 +38,58 @@ namespace WatsonCompetitionCode
                     Console.Write("Completed");
                     break;
 
+                case "FFNetwork":
+                    dict = utility.csvReader(args[1]);
+                    if (args[2] == "1") utility.removeExtraneousData(dict, normalize);
+                    //utility.csvWriter("tgmc_cut1.csv", dict);
+
+                    trainDict = utility.csvReader("tgmc_cut1.csv");
+                    Candidate c = new Candidate();
+                    trainDict.TryGetValue(1, out c);
+
+                    bool allFeats = false;
+                    //features = utility.removeMore(trainDict, "BestFeatures.txt");
+                    features = utility.readFeatures("bestFeatures3.txt");
+                    if (allFeats)
+                    {
+                        features.features.Add(new List<int>());
+                        for (int j = 0; j < c.featuresRating.Count(); j++)
+                        {
+                            features.features[0].Add(j);
+                            features.featuresVector.Add(j);
+                        }
+                    }
+
+                    List<int> numLayers = new List<int>();
+                    List<List<int>> NPL = new List<List<int>>();
+                    List<double> Lrate = new List<double>();
+                    List<int> sysT = new List<int>();
+                    Random randN = new Random();
+                    for (int k = 0; k < features.features.Count(); k++)
+                    {
+                        numLayers.Add((int)(3 * randN.NextDouble() + 1));
+                        NPL.Add(new List<int>());
+                        for (int j = 0; j < numLayers[k]; j++)
+                        {
+                            NPL[k].Add((int)(30 * randN.NextDouble() + 1));
+                        }
+                        Lrate.Add(0.002);
+                        sysT.Add(2);
+                    }
+
+                    double CRate = 0.6;
+
+                    EnsembleFF ff = new EnsembleFF(numLayers, NPL, features.features, Lrate, sysT);
+                    ff.trainSystem(trainDict, CRate, -1);
+                    ff.FFwriter("weightsFF.txt");
+
+                    //EnsembleRBF rbf = new EnsembleRBF();
+                    //rbf.RBFreader("weights.txt",-1);
+
+                    results = ff.testSystem(testDict, CRate);
+                    dict = testDict;
+
+                    break;
                 case "RBFNetwork":
                     
                     
@@ -42,10 +97,6 @@ namespace WatsonCompetitionCode
 
                     if (args[2] == "1") utility.removeExtraneousData(dict, normalize);
                     //utility.csvWriter("tgmc_cut1.csv", dict);
-
-                    Dictionary<int, Candidate> trainDict = new Dictionary<int, Candidate>();
-                    Dictionary<int, Candidate> testDict = new Dictionary<int, Candidate>();
-                    FeatureData features = new FeatureData();
 
                     // EnsembleRBF(List<int> numNod, List<List<int>> features, List<double> deltaWeight, StatisticalData sd, Dictionary<int, Candidate> dict, bool use)
                     //testDict = utility.csvReader("tgmctrain_small.csv");
@@ -120,8 +171,10 @@ namespace WatsonCompetitionCode
                         Console.WriteLine("reading file");
                         Dictionary<int, Candidate> FullSet = utility.csvReader("tgmctrain.csv");
                         Console.WriteLine("read file");
-                        while (true)
+                        bool run = true;
+                        while (run)
                         {
+                            // run = false;
                             if (true)
                             {
                                 
@@ -132,18 +185,18 @@ namespace WatsonCompetitionCode
                                 Random gen = new Random();
                                 while (dict.Count < sizeOfTrain)
                                 {
-                                    int rand = gen.Next(FullSet.Count);
-                                    while (rand == 0) rand = gen.Next(FullSet.Count);
-                                    if (!dict.ContainsValue(FullSet[rand]))
+                                    int randNum = gen.Next(FullSet.Count);
+                                    while (randNum == 0) randNum = gen.Next(FullSet.Count);
+                                    if (!dict.ContainsValue(FullSet[randNum]))
                                     {
-                                        if (FullSet[rand].isTrue && numTrue < (1000))
+                                        if (FullSet[randNum].isTrue && numTrue < (1000))
                                         {
-                                            dict.Add(dict.Count + 1, FullSet[rand]);
+                                            dict.Add(dict.Count + 1, FullSet[randNum]);
                                             numTrue++;
                                         }
-                                        else if (!FullSet[rand].isTrue && numFalse < (9000))
+                                        else if (!FullSet[randNum].isTrue && numFalse < (9000))
                                         {
-                                            dict.Add(dict.Count + 1, FullSet[rand]);
+                                            dict.Add(dict.Count + 1, FullSet[randNum]);
                                             numFalse++;
                                         }
                                     }
@@ -300,8 +353,10 @@ namespace WatsonCompetitionCode
                                 //utility.removeMore(largeSet, removed);
                                 //Console.WriteLine("Writing new file");
                                 //utility.csvWriter("tgmctrainFiltered.csv", largeSet);
-                                while (true)
+                                bool run = true;
+                                while (run)
                                 {
+                                    // run = false;
                                     confidence = 0.99;
                                     Console.WriteLine("Evaluating at Confidence: " + confidence);
                                     foreach (KeyValuePair<int, Candidate> pair in newSet)
@@ -318,7 +373,7 @@ namespace WatsonCompetitionCode
                                      Console.WriteLine("Total correct falses: " + numCorrectFalse);
                                      Console.WriteLine("Total false negatives: " + numFalseNegative);*/
                                     Console.WriteLine("Finished");
-                                    utility.fileWriter(answer, newSet, "LogisticRegressionTestAnswer5k.txt");
+                                    utility.fileWriter(answer, newSet, "LogisticRegressionTestAnswer5k.txt",false);
                                 }
                                 break;
                             case 4:
@@ -340,8 +395,10 @@ namespace WatsonCompetitionCode
                                 utility.removeMore(trainingSet, removed);
                                 /* Console.WriteLine("Writing new file");
                                  utility.csvWriter("tgmctrainFilteredLarge.csv", largeSet);*/
-                                while (true)
+                                bool run2 = true;
+                                while (run2)
                                 {
+                                    // run2 = false;
                                     confidence = 0.9;
                                     numActualTrue = 0;
                                     numCorrectlyTrue = 0;
@@ -434,7 +491,7 @@ namespace WatsonCompetitionCode
                                      Console.WriteLine("Total correct falses: " + numCorrectFalse);
                                      Console.WriteLine("Total false negatives: " + numFalseNegative);*/
                                     Console.WriteLine("Finished");
-                                    utility.fileWriter(answer1, newSet1, "LogisticRegressionTestAnswerMulti.txt");
+                                    utility.fileWriter(answer1, newSet1, "LogisticRegressionTestAnswerMulti.txt",false);
                                 }
 
     
