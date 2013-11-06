@@ -6,45 +6,53 @@ using System.Threading.Tasks;
 using MathNet.Numerics.LinearAlgebra.Double;
 
 
+
+
 namespace WatsonCompetitionCode
 {
+
     class LogisiticRegression
     {
         private Dictionary<int, Candidate> trainingDataSet;
-        private DenseVector theta;
+        public DenseVector theta;
         private DenseVector J;
         private DenseMatrix x;
         private DenseVector y;
         private DenseMatrix hessianResult;
-        public const int MAX_ITERATIONS= 7;
         private int m;
         private int n;
-        
+        public const int MAX_ITERATIONS = 7;
+        public int timesNonInvertable = 0;
+        public double nonInvertableModifier = 0.0001;
 
-
-        public LogisiticRegression(Dictionary<int,Candidate> data)
+        private LogisiticRegression()
         {
+
+        }
+
+
+        public LogisiticRegression(Dictionary<int, Candidate> data)
+        {
+            DenseMatrix testMat = new DenseMatrix(50000, 318, 2.0);
             this.trainingDataSet = data;
-            int numberFeatures = trainingDataSet[1].featuresRating.Count;
+            int numberFeatures = trainingDataSet.Values.First().featuresRating.Count();
 
             //Initialize xdata matrix
             DenseVector[] xdata;
             xdata = new DenseVector[trainingDataSet.Count];
             //xdata[0] = new DenseVector(numberFeatures,1); 
             int k = 0;
-           
 
             //intialize y data
             List<double> ydata = new List<double>();
-            
 
             //fill x and y data from dictionary
-            foreach (KeyValuePair<int,Candidate> candidate in trainingDataSet)
+            foreach (KeyValuePair<int, Candidate> Candidate in trainingDataSet)
             {
-                List<double> intermediate = candidate.Value.featuresRating.ToList();
+                List<double> intermediate = Candidate.Value.featuresRating.ToList();
                 intermediate.Insert(0, 1);
                 xdata[k] = new DenseVector(intermediate.ToArray());
-                if (candidate.Value.isTrue) ydata.Add(1);
+                if (Candidate.Value.isTrue) ydata.Add(1);
                 else ydata.Add(0);
                 k++;
             }
@@ -54,24 +62,39 @@ namespace WatsonCompetitionCode
             y = new DenseVector(ydata.ToArray());
 
             m = x.RowCount;
-            n = x.ColumnCount-1;
+            n = x.ColumnCount - 1;
 
             //Intialize fitting parameters, theta
-            theta = new DenseVector(m+1,1);
-            /*test code
-            DenseVector z;
-            z = x * theta;
-            double[] test1;
-            test1 = new double[3] {2,3,4};
-            double[] test2;
-            test2 = new double[3] {4,3,2};
-            DenseVector test1V = new DenseVector(test1);
-            DenseVector test2V = new DenseVector(test2);
-            DenseVector result = (DenseVector) test1V.PointwiseMultiply(test2V);*/
-            
+            theta = new DenseVector(n + 1, 0);
 
+           // this.writeToFile();
+        }
 
-            //Console.ReadLine();
+        //Creates an AI That only has Theta, cannon train or anything.
+        /// <summary>
+        /// Creates an LogrithmicRegression based on previous training data. Only intilializes theta vector, all others null. So only probabilty function works
+        /// </summary>
+        /// <param name="path">The Path to the AI file. Defaults to "LogisticRegressionAi.txt"</param>
+        public LogisiticRegression(String path = "LogisticRegressionAi.txt")
+        {
+            System.IO.StreamReader reader = new System.IO.StreamReader(path);
+            String line = reader.ReadLine();
+            String[] values = line.Split(',');
+            List<Double> thetaL = new List<double>();
+            foreach (String value in values)
+            {
+                if (value == "") break;
+                thetaL.Add(Convert.ToDouble(value));
+            }
+
+            reader.Close();
+            this.theta = new DenseVector(thetaL.ToArray());
+            Console.WriteLine("Successfuly Restored old AI");
+        }
+
+        public DenseVector convergenceValue()
+        {
+            return J;
         }
 
         private DenseVector sigmoid(DenseVector z)
@@ -83,13 +106,23 @@ namespace WatsonCompetitionCode
             }
             return new DenseVector(vector.ToArray());
         }
+        private double sigmoid(double z)
+        {
+            return 1.0 / (1.0 + Math.Exp(-z));
+        }
+        //Probability Function
         public double probability(List<double> features)
         {
-            return 0;
+            List<double> list = features.ToList();
+            list.Insert(0, 1);
+            DenseVector feat = new DenseVector(list.ToArray());
+            double z = feat * theta;
+            return sigmoid(z);
         }
         private DenseVector gradient(DenseMatrix xMat, DenseVector hVec, DenseVector yVec)
         {
-            DenseVector grad = (DenseVector)(xMat.Transpose().Divide(m) * (hVec - yVec));
+            DenseVector grad = (DenseVector)(((double)1.0 / m) * (xMat.Transpose()) * (hVec - yVec));
+
             return grad;
         }
         private DenseMatrix hessian(DenseMatrix xMat, DenseVector hVec)
@@ -98,23 +131,49 @@ namespace WatsonCompetitionCode
             DiagonalMatrix diag = DiagonalMatrix.Identity(hVec.Count);
             diag.SetDiagonal(hVec);
             DiagonalMatrix diagMinus1 = DiagonalMatrix.Identity(hVec.Count);
-            diagMinus1.SetDiagonal(1-hVec);
-            result = (DenseMatrix) ((xMat.Transpose().Divide(m)) * diag * diagMinus1 * xMat);
+            diagMinus1.SetDiagonal(1 - hVec);
+            result = (DenseMatrix)((xMat.Transpose().Divide(m)) * diag * diagMinus1 * xMat);
+            Console.WriteLine("Computed Hessian");
             return result;
         }
         public void train(int iterations = MAX_ITERATIONS)
         {
             J = new DenseVector(iterations, 0);
+            theta = new DenseVector(n + 1, 0);
             for (int k = 0; k < iterations; k++)
             {
+                Console.WriteLine("Computing z");
                 DenseVector z = x * theta;
+                Console.WriteLine("Computing h");
                 DenseVector h = sigmoid(z);
+                Console.WriteLine("Computing grad");
                 DenseVector grad = gradient(x, h, y);
+                Console.WriteLine("Computing H");
                 DenseMatrix H = hessian(x, h);
 
                 //Calculate J for testing convergence
-                J[k] = (double) (y.Negate().PointwiseMultiply((DenseVector) log(h)) - (1-y).PointwiseMultiply( (DenseVector) log((DenseVector)(1-h)))).Sum();
-                theta = (DenseVector) (theta - H.Inverse()*grad);
+                Console.WriteLine("Computing J["+k+"]");
+                J[k] = (double)(y.Negate().PointwiseMultiply((DenseVector)log(h)) - (1 - y).PointwiseMultiply((DenseVector)log((DenseVector)(1 - h)))).Sum() / m;
+
+                Console.WriteLine("Computing theta");
+                //Compute Theta
+                theta = (DenseVector)(theta - H.Inverse() * grad);
+                
+
+                //Check for non invertable Hessian Matrix, if true, re-train with diagonals have slight value added
+                if (Double.IsNaN(theta[0]))
+                {
+                    DenseVector xDiag = (DenseVector)x.Diagonal();
+                    x.SetDiagonal(xDiag + nonInvertableModifier);
+                    timesNonInvertable++;
+                    Console.Write("Unable to Compute Inverse, adding to Diagonal");
+                    Console.WriteLine();
+                    train(iterations);
+                    break;
+                }
+                
+                Console.WriteLine("Competed Pass " + k);
+                //if (k >= 2) break;
             }
         }
         private DenseVector log(DenseVector vec)
@@ -126,8 +185,24 @@ namespace WatsonCompetitionCode
             }
             return new DenseVector(result.ToArray());
         }
-        
+        public void writeToFile(String path = "LogisticRegressionAi.txt")
+        {
+            List<double> thetaL = theta.ToList();
+            StringBuilder s = new StringBuilder();
+            foreach (double val in thetaL)
+            {
+                s.Append(val);
+                s.Append(",");
+            }
+
+
+            var writer = new System.IO.StreamWriter(path);
+            writer.WriteLine(s.ToString());
+            writer.Close();
+        }
+
+
     }
-    
+
 }
 
