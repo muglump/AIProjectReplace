@@ -9,46 +9,101 @@ namespace WatsonCompetitionCode
 {
     class RBFnetwork
     {
-        private int numNodes;
-        private int numFeatures;
-        private double learningRate;
-        private List<List<double>> mean;
-        private List<List<double>> variance;
-        private List<double> weight;
-        private List<double> BF;
+        public int numNodes;
+        public int numFeatures;
+        public double learningRate;
+        public double checkRate;
+        public double goalNum;
+        public List<List<double>> mean;
+        public List<List<double>> deltaMean;
+        public List<List<double>> variance;
+        public List<List<double>> deltaVariance;
+        public List<double> weight;
+        public List<double> deltaWeight;
+        public List<double> BF;
+        public List<int> featureList;
 
         // Random initialization for means, variances, etc.
-        public RBFnetwork(int numNod, int numFeat, double deltaWeight, StatisticalData sd, Dictionary<int, Candidate> dict, bool use)
+        public RBFnetwork(int numNod, double deltaWeight, List<int> features, double goalNumber, StatisticalData sd, Dictionary<int, Candidate> dict, bool use)
         {
             numNodes = numNod;
-            numFeatures = numFeat;
+            numFeatures = features.Count();
             learningRate = deltaWeight;
+            checkRate = 0.5*goalNumber; // max 1
+            goalNum = goalNumber;
 
             mean = new List<List<double>>();
             variance = new List<List<double>>();
             weight = new List<double>();
-            BF = new List<double>();
             Random random = new Random();
             Candidate c = new Candidate();
+            featureList = features;
 
             if (use)
             {
                 List<int> index = new List<int>();
-                int test = -1;
                 int total = dict.Count();
-                for (int k = 0; k < numNodes; k++)
+                int numNodesFalse = (3*numNodes) / 5;
+                int numNodesTrue = numNodes - numNodesFalse;
+                int indexF = 0;
+                int indexT = 0;
+                int numTrue = total / 61;
+                int numFalse = (60*total)/61;
+                double trueRatio = numTrue / numNodesTrue;
+                double falseRatio = numFalse/numNodesFalse;
+                int nextIndexT = (int)(trueRatio * random.NextDouble() + 1);
+                int nextIndexF = (int)(falseRatio * random.NextDouble() + 1);
+                int i = 1;
+                int countT = 0;
+                int countF = 0;
+                List<int> addIfNec = new List<int>();
+
+                while (dict.ContainsKey(i) && (countT + countF) < numNodes)
                 {
-                    if (test == -1)
+                    dict.TryGetValue(i, out c);
+                    if (c.isTrue)
                     {
-                        test = (int)((total / numNodes) * random.NextDouble()) + 1;
-                        index.Add(test);
+                        if (indexT >= nextIndexT)
+                        {
+                            indexT = 0;
+                            numTrue = (total - i) / 61;
+                            nextIndexT = (int)(trueRatio * random.NextDouble() + 1);
+                            numNodesTrue--;
+                            if (numNodesTrue < 0) continue;
+                            trueRatio = numTrue / (numNodesTrue+1);
+                            index.Add(i);
+                            countT++;
+                        }
+                        else
+                        {
+                            if (indexT == nextIndexT / 2) addIfNec.Add(i);
+                            indexT++;
+                        }
                     }
                     else
                     {
-                        test = (int)((total / numNodes) * random.NextDouble()) + 1;
-                        index.Add(index[index.Count() - 1] + test);
+                        if (indexF >= nextIndexF)
+                        {
+                            
+                            indexF = 0;
+                            numFalse = (60 * (total - i)) / 61;
+                            nextIndexF = (int)(falseRatio * random.NextDouble() + 1);
+                            numNodesFalse--;
+                            if (numNodesFalse < 0) continue;
+                            falseRatio = numFalse / (numNodesFalse + 1);
+                            index.Add(i);
+                            countF++;
+                        }
+                        else indexF++;
                     }
-                    total -= test;  
+
+                    i++;
+                }
+
+                int currentCount = index.Count();
+                for (int k = 0; k < numNodes - currentCount; k++)
+                {
+                    index.Add(addIfNec[addIfNec.Count()-k-1]);
                 }
 
                 //double v = 0;
@@ -59,18 +114,17 @@ namespace WatsonCompetitionCode
                     dict.TryGetValue(index[k], out c);
                     for (int j = 0; j < numFeatures; j++)
                     {
-                        mean[k].Add(c.featuresRating[j]);
+                        mean[k].Add(c.featuresRating[features[j]]);
 
-                        //if (c.isTrue) v = Math.Abs(sd.variancesT[j] + 0.2 * (random.NextDouble() - 0.1));
-                        //else v = Math.Abs(sd.variancesF[j] + 0.2 * (random.NextDouble() - 0.1));
+                        //if (c.isTrue) v = Math.Abs(sd.variancesT[features[j]] + 0.2 * (random.NextDouble() - 0.1));
+                        //else v = Math.Abs(sd.variancesF[features[j]] + 0.2 * (random.NextDouble() - 0.1));
                         //if (v < 0.01) v = 0.01;
                         //variance[k].Add(v);
 
-                        variance[k].Add(5*random.NextDouble()+0.001);
+                        variance[k].Add(4*random.NextDouble()+0.001);
                     }
                     if (c.isTrue) weight.Add(0.7+0.3*random.NextDouble());
                     else weight.Add(-(0.7+0.3*random.NextDouble()));
-                    BF.Add(0);
                 }
             }
             else
@@ -85,13 +139,13 @@ namespace WatsonCompetitionCode
                         variance[k].Add(3 * random.NextDouble() + 0.001);
                     }
                     weight.Add(2 * random.NextDouble() - 1);
-                    BF.Add(0);
                 }
             }
+            genInit();
         }
 
         // Pre-initialized rather than random means, variances, etc. (can do training or leave as is)
-        public RBFnetwork(int numNod, int numFeat, double deltaWeight, List<List<double>> means, List<List<double>> variances, List<double> weights)
+        public RBFnetwork(int numNod, int numFeat, double deltaWeight, double goalNumber, List<int> features, List<List<double>> means, List<List<double>> variances, List<double> weights)
         {
             numNodes = numNod;
             numFeatures = numFeat;
@@ -99,85 +153,49 @@ namespace WatsonCompetitionCode
             variance = variances;
             weight = weights;
             learningRate = deltaWeight;
+            checkRate = 0.5*goalNumber;
+            goalNum = goalNumber;
+            featureList = features;
+            genInit();
+        }
+
+        private void genInit()
+        {
+            deltaMean = new List<List<double>>();
+            deltaVariance = new List<List<double>>();
+            deltaWeight = new List<double>();
+            BF = new List<double>();
 
             for (int k = 0; k < numNodes; k++)
             {
+                deltaMean.Add(new List<double>());
+                deltaVariance.Add(new List<double>());
+                for (int j = 0; j < numFeatures; j++)
+                {
+                    deltaMean[k].Add(0);
+                    deltaVariance[k].Add(0);
+                }
+                deltaWeight.Add(0);
                 BF.Add(0);
             }
         }
 
-        public void RBFreader(string fileName)
+        public void RBFwriter(StreamWriter writer)
         {
-            var reader = new StreamReader(File.OpenRead(@fileName));
-            List<string> lineRead = new List<string>();
-            var line = reader.ReadLine();
-            numNodes = Convert.ToInt32(line);
-            line = reader.ReadLine();
-            numFeatures = Convert.ToInt32(line);
-            line = reader.ReadLine();
-            learningRate = (float)Convert.ToDouble(line);
+            System.Text.StringBuilder strToWrite = new System.Text.StringBuilder();
 
-            mean = new List<List<double>>();
-            variance = new List<List<double>>();
-            weight = new List<double>();
-            BF = new List<double>();
-
-            var values = line.Split(',');
-            int i = 0;
-            int numLine = 0;
-            int done = numNodes;
-            while (!reader.EndOfStream)
-            {
-                line = reader.ReadLine();
-                values = line.Split(',');
-                switch (i)
-                {
-                    case 0:
-                        BF.Add(0); // Initialize once
-                        mean.Add(new List<double>());
-                        for (int k = 0; k < values.Count(); k++)
-                        {
-                            mean[numLine].Add(Convert.ToDouble(values[k]));
-                        }
-                        numLine++;
-                        break;
-                    case 1:
-                        variance.Add(new List<double>());
-                        for (int k = 0; k < values.Count(); k++)
-                        {
-                            variance[numLine].Add(Convert.ToDouble(values[k]));
-                        }
-                        numLine++;
-                        break;
-                    case 2:
-                        for (int k = 0; k < values.Count(); k++)
-                        {
-                            weight.Add(Convert.ToDouble(values[k]));
-                        }
-                        done = 1;
-                        numLine++;
-                        break;
-                    default:
-                        break;
-                }
-                if (numLine == done)
-                {
-                    numLine = 0;
-                    i++;
-                }
-            }
-            reader.Close();
-        }
-
-        public void RBFwriter(string fileName)
-        {
-            File.Delete(@fileName);
-            var writer = new StreamWriter(File.OpenWrite(@fileName));
             writer.WriteLine(numNodes);
             writer.WriteLine(numFeatures);
             writer.WriteLine(learningRate);
 
-            System.Text.StringBuilder strToWrite = new System.Text.StringBuilder();
+            strToWrite.Clear();
+            strToWrite.Append(featureList[0].ToString());
+            for (int k = 1; k < numFeatures; k++)
+            {
+                strToWrite.Append(',' + featureList[k].ToString());
+            }
+            writer.WriteLine(strToWrite);
+
             for (int k = 0; k < numNodes; k++)
             {
                 strToWrite.Clear();
@@ -186,7 +204,7 @@ namespace WatsonCompetitionCode
                 {
                     strToWrite.Append(',' + mean[k][j].ToString());
                 }
-                writer.WriteLine(strToWrite.ToString());
+                writer.WriteLine(strToWrite);
             }
 
             for (int k = 0; k < numNodes; k++)
@@ -197,7 +215,7 @@ namespace WatsonCompetitionCode
                 {
                     strToWrite.Append(',' + variance[k][j].ToString());
                 }
-                writer.WriteLine(strToWrite.ToString());
+                writer.WriteLine(strToWrite);
             }
 
             strToWrite.Clear();
@@ -206,17 +224,15 @@ namespace WatsonCompetitionCode
             {
                 strToWrite.Append(',' + weight[k].ToString());
             }
-            writer.WriteLine(strToWrite.ToString());
-
-            writer.Close();
+            writer.WriteLine(strToWrite);
         }
 
         private double basisFunction(List<double> input, int hidUnNum)
         {
             double result = 0;
-            for (int k = 0; k < input.Count(); k++)
+            for (int k = 0; k < numFeatures; k++)
             {
-                result -= Math.Pow(input[k] - mean[hidUnNum][k], 2) / (2 * Math.Pow(variance[hidUnNum][k], 2));
+                result -= Math.Pow(input[featureList[k]] - mean[hidUnNum][k], 2) / (2 * Math.Pow(variance[hidUnNum][k], 2));
             }
 
             return Math.Exp(result);
@@ -233,145 +249,115 @@ namespace WatsonCompetitionCode
                 BF[k] = bfout;
                 output += bfout * weight[k];
             }
-
-            //System.Console.WriteLine("Out: {0:F20}", output);
             return output;
         }
 
-        public void trainSystem(Dictionary<int, Candidate> candidates)
+        public List<double> trainSystem(Dictionary<int, Candidate> dict)
         {
-            List<List<double>> deltaMean = new List<List<double>>();
-            List<List<double>> deltaVariance = new List<List<double>>();
-            List<double> deltaWeight = new List<double>();
-            List<double> checker = new List<double>();
-            List<double> candCheck = new List<double>();
-            int i = 0;
-            Candidate candidate = new Candidate();
-            double djdy = -1;
+            List<double> output = new List<double>();
+            bool doChange;
+            double TratioF = (double) 4; // 1/60
+            double djdyInt = -1;
             double dHUdm = 1;
             double dHUdv = 1;
-            int numOffT = 1;
-            int numOffF = 1;
+            Candidate candidate = new Candidate();
 
-            for (int k = 0; k < numNodes; k++)
+            double tempOut = 0;
+            for (int k = 0; k < dict.Count(); k++)
             {
-                deltaMean.Add(new List<double>());
-                deltaVariance.Add(new List<double>());
-                for (int j = 0; j < numFeatures; j++)
+                dict.TryGetValue(k + 1, out candidate);
+                tempOut = useSystem(candidate.featuresRating);
+                if (tempOut > goalNum) tempOut = goalNum;
+                else if (tempOut < -goalNum) tempOut = -goalNum;
+                output.Add(tempOut);
+
+                if (candidate.isTrue == true)
                 {
-                    deltaMean[k].Add(0);
-                    deltaVariance[k].Add(0);
+                    if (output[k] < (goalNum - checkRate)) doChange = true;
+                    else doChange = false;
                 }
-                deltaWeight.Add(0);
-            }
-
-            i = 1;
-            while (candidates.ContainsKey(i))
-            {
-                candidates.TryGetValue(i, out candidate);
-                checker.Add(0);
-                if (candidate.isTrue) candCheck.Add(1);
-                else candCheck.Add(-1);
-                i++;
-            }
-
-            // learning
-            int totalWrong = 0;
-            int totalRight = 0;
-            bool doChange = false;
-            double checkRate = 0.8; // max of 1
-            int count = 0;
-            while (numOffT != 0 || numOffF != 0)
-            {
-                numOffT = 0;
-                numOffF = 0;
-                i = 1;
-                while (candidates.ContainsKey(i))
+                else
                 {
-                    candidates.TryGetValue(i, out candidate);
-                    checker[i-1] = useSystem(candidate.featuresRating);
-                    if (candidate.isTrue)
-                    {
-                        if (checker[i - 1] < (candCheck[i - 1] - checkRate)) doChange = true;
-                        else doChange = false;
-                    }
-                    else
-                    {
-                        if (checker[i - 1] > (candCheck[i-1] + checkRate)) doChange = true;
-                        else doChange = false;
-                    }
-
-                    if (doChange)
-                    {
-                        if (candCheck[i - 1] == 1) numOffT++;
-                        else numOffF++;
-                        djdy = candCheck[i - 1] - checker[i - 1];
-
-                        for (int k = 0; k < numNodes; k++)
-                        {
-                            for (int j = 0; j < numFeatures; j++)
-                            {
-                                dHUdm = (candidate.featuresRating[j] - mean[k][j]) / (Math.Pow(variance[k][j], 2));
-                                dHUdv = (Math.Pow(candidate.featuresRating[j] - mean[k][j], 2) / Math.Pow(variance[k][j], 3));
-                                deltaMean[k][j] = learningRate * djdy * weight[k] * BF[k] * dHUdm;
-                                deltaVariance[k][j] = learningRate * djdy * weight[k] * BF[k] * dHUdv;
-
-                                //mean[k][j] += learningRate * djdy * weight[k] * BF[k] * dHUdm;
-                                //variance[k][j] += learningRate * djdy * weight[k] * BF[k] * dHUdv;
-                            }
-                            deltaWeight[k] = learningRate * djdy * BF[k];
-                            //weight[k] += learningRate * djdy * BF[k];
-                        }
-                    }
-                    i++;
+                    if (output[k] > (-goalNum + 2 * checkRate)) doChange = true;
+                    else doChange = false;
                 }
 
-                // update weights/values
-                if (numOffT != 0 || numOffF != 0)
+                if (doChange)
                 {
-                    for (int k = 0; k < numNodes; k++)
+                    if (candidate.isTrue) djdyInt = (goalNum - output[k]) * TratioF;
+                    else djdyInt = -goalNum - output[k];
+
+                    for (int m = 0; m < numNodes; m++)
                     {
                         for (int j = 0; j < numFeatures; j++)
                         {
-                            mean[k][j] += deltaMean[k][j];
-                            variance[k][j] += deltaVariance[k][j];
+                            dHUdm = (candidate.featuresRating[featureList[j]] - mean[m][j]) / (Math.Pow(variance[m][j], 2));
+                            dHUdv = (Math.Pow(candidate.featuresRating[featureList[j]] - mean[m][j], 2) / Math.Pow(variance[m][j], 3));
+                            if (k == 0)
+                            {  
+                                deltaMean[m][j] = learningRate * djdyInt * weight[m] * BF[m] * dHUdm;
+                                deltaVariance[m][j] = learningRate * djdyInt * weight[m] * BF[m] * dHUdv;
+                            }
+                            else
+                            {
+                                deltaMean[m][j] += learningRate * djdyInt * weight[m] * BF[m] * dHUdm;
+                                deltaVariance[m][j] += learningRate * djdyInt * weight[m] * BF[m] * dHUdv;
+                            }
                         }
-                        weight[k] += deltaWeight[k];
+                        deltaWeight[m] = learningRate * djdyInt * BF[m];
                     }
                 }
-                totalWrong = numOffT + numOffF;
-                totalRight = candidates.Count() - totalWrong;
-                count++;
-                Console.WriteLine(count + ": !T=" + numOffT + ", !F=" + numOffF + ", C=" + totalRight + ", Lr=" + learningRate + ", T=" + checkRate);
-
-                if (learningRate > 0.015) learningRate -= 0.01;
-                else if (learningRate > 0.0025) learningRate -= 0.002;
-                else if (learningRate > 0.00025) learningRate -= .0001;
-
-                if (checkRate > 0.4) checkRate -= 0.05;
-                else if (checkRate > 0.2) checkRate -= 0.02;
-                else if (checkRate > 0.1) checkRate -= 0.01;
             }
-            Console.WriteLine("I'm done training!\n");
+
+            updateSystem();
+
+            if (learningRate > 0.15) learningRate -= 0.1;
+            else if (learningRate > 0.015) learningRate -= 0.01;
+            else if (learningRate > 0.0025) learningRate -= 0.002;
+            else if (learningRate > 0.00025) learningRate -= 0.0001;
+            else if (learningRate > 0.000025) learningRate -= 0.00001;
+            else learningRate = 0.000025;
+
+            if (checkRate > 0.4 * goalNum) checkRate -= 0.05 * goalNum;
+            else if (checkRate > 0.25 * goalNum) checkRate -= 0.02 * goalNum;
+            else checkRate = 0.25;    
+
+            return output;
         }
 
-        public List<bool> testSystem(Dictionary<int, Candidate> candidates)
+        private void updateSystem()
         {
-            List<bool> results = new List<bool>();
-            int i = 1;
-            double checker = 0;
-            Candidate candidate = new Candidate();
-            while (candidates.ContainsKey(i))
+            // update weights/values
+            for (int k = 0; k < numNodes; k++)
             {
-                candidates.TryGetValue(i, out candidate);
-                checker = useSystem(candidate.featuresRating);
+                for (int j = 0; j < numFeatures; j++)
+                {
+                    mean[k][j] += deltaMean[k][j];
+                    variance[k][j] += deltaVariance[k][j];
+                }
+                weight[k] += deltaWeight[k];
+            }
+        }
 
-                if (checker >= 0.5) results.Add(true);
-                else results.Add(false);
+        public List<double> testSystem(Dictionary<int, Candidate> dict)
+        {
+            List<double> output = new List<double>();
+            int i = 1;
+            Candidate candidate = new Candidate();
 
+            // find current outputs of network
+            double tempOut;
+            while (dict.ContainsKey(i))
+            {
+                dict.TryGetValue(i, out candidate);
+                tempOut = useSystem(candidate.featuresRating);
+                if (tempOut > goalNum) tempOut = goalNum;
+                else if (tempOut < -goalNum) tempOut = -goalNum;
+                output.Add(tempOut);
                 i++;
             }
-            return results;
+
+            return output;
         }
     }
 }
