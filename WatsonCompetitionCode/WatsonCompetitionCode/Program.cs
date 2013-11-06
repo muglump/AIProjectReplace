@@ -15,8 +15,8 @@ namespace WatsonCompetitionCode
             Util utility = new Util();
             List<bool> results = new List<bool>();
             Dictionary<int, Candidate> dict = utility.csvReader(args[1]);
-            if (args[2] == "1") utility.removeExtraneousData(dict);
-            utility.csvWriter("tgmc_cut1.csv", dict);
+            //if (args[2] == "1") utility.removeExtraneousData(dict);
+            //utility.csvWriter("tgmc_cut1.csv", dict);
 
             switch (args[0])
             {
@@ -34,33 +34,69 @@ namespace WatsonCompetitionCode
                     
                     Dictionary<int, Candidate> trainDict = new Dictionary<int, Candidate>();
                     Dictionary<int, Candidate> testDict = new Dictionary<int, Candidate>();
+                    FeatureData features = new FeatureData();
+
+                    // EnsembleRBF(List<int> numNod, List<List<int>> features, List<double> deltaWeight, StatisticalData sd, Dictionary<int, Candidate> dict, bool use)
                     //testDict = utility.csvReader("tgmctrain_small.csv");
-                    testDict = utility.csvReader("tgmc_cut1.csv");
+                    //testDict = utility.csvReader("tgmc_cut1.csv");
                     //testDict = utility.csvReader("tgmc_cut2.csv");
+                    //testDict = utility.csvReader("tgmc_cut3.csv");
+                    //testDict = utility.csvReader("tgmc_cutTest.csv");
                     //trainDict = utility.csvReader("tgmctrain_small.csv");
-                    // trainDict = utility.csvReader("tgmc_cut1.csv");
+                    trainDict = utility.csvReader("tgmc_cut1.csv");
                     //trainDict = utility.csvReader("tgmc_cut2.csv");
+                    //trainDict = utility.csvReader("tgmc_cut3.csv");
+                    //trainDict = utility.csvReader("tgmc_cutTest.csv");
                     //trainDict = testDict;
+                    testDict = trainDict;
 
-                    utility.dataAnalysis(testDict, true);
-                    //utility.removeMore(testDict, "BestFeatures.txt");
+                    //utility.dataAnalysis(testDict, true);
                     //utility.csvWriter("tgmc_cut2.csv",trainDict);
-                    //trainDict = utility.randSample(testDict, 1);
-                    //utility.csvWriter("tgmc_cut3.csv",trainDict);
+                    //trainDict = utility.randSample(testDict, 2);
+                    //utility.csvWriter("tgmc_cutTest.csv",trainDict);
 
-                    //Candidate cand = new Candidate();
-                    //trainDict.TryGetValue(1, out cand);
-                    //StatisticalData sd = utility.dataAnalysis(trainDict, true);
-                    //StatisticalData sd = utility.dataAnalysis(trainDict, false);
-                    //RBFnetwork rbf = new RBFnetwork(100, cand.featuresRating.Count(), 0.02, sd, trainDict, true);
+                    Candidate cand = new Candidate();
+                    trainDict.TryGetValue(1, out cand);
+                    StatisticalData sd = utility.dataAnalysis(trainDict, false);
 
-                    //rbf.trainSystem(trainDict);
-                    //rbf.RBFwriter("weights.txt");
-                    //results = rbf.testSystem(testDict);
+                    bool allFeat = false;
+                    //features = utility.removeMore(trainDict, "BestFeatures.txt");
+                    features = utility.readFeatures("bestFeatures3.txt");
+                    if (allFeat)
+                    {
+                        features.features.Add(new List<int>());
+                        for (int j = 0; j < cand.featuresRating.Count(); j++)
+                        {
+                            features.features[0].Add(j);
+                            features.featuresVector.Add(j);
+                        }
+                    }
 
-                    //rbf.RBFreader("weights.txt");
-                    //results = rbf.testSystem(testDict);
+                    List<int> numNodes = new List<int>();
+                    List<double> learningRate = new List<double>();
+                    Random rand = new Random();
+                    for (int k = 0; k < features.features.Count(); k++)
+                    {
+                        numNodes.Add((int)(100*(rand.NextDouble()-0.5)+400));
+                        learningRate.Add(0.005 + 0.002*(rand.NextDouble()-0.5));
+                    }
 
+                    double CR = 0.5;
+
+                    bool testCombo = false;
+                    List<List<int>> bestFeatures = new List<List<int>>();
+                    if (testCombo) bestFeatures = utility.BruteForceTest(features,sd,trainDict);
+                    else bestFeatures = features.features;
+
+                    EnsembleRBF rbf = new EnsembleRBF(numNodes, bestFeatures, learningRate, sd, trainDict, true);
+                    rbf.trainSystem(trainDict, CR, -1);
+                    rbf.RBFwriter("weights.txt");
+
+                    //EnsembleRBF rbf = new EnsembleRBF();
+                    //rbf.RBFreader("weights.txt",-1);
+
+                    results = rbf.testSystem(testDict, CR);
+                    dict = testDict;
                     break;
 
                 case "LogisticRegression":
@@ -79,11 +115,11 @@ namespace WatsonCompetitionCode
             }
             */
 
+            Console.WriteLine("Done testing system - press enter to print results in 'output.txt'");
             Console.ReadLine();
-            utility.fileWriter(results, dict, "output.txt");
-        }
-
-       
+            utility.fileWriter(results, dict, "output2.txt",false);
+            Console.ReadLine();
+        }  
     }
 
     class Candidate
@@ -99,6 +135,18 @@ namespace WatsonCompetitionCode
             questionNumber = 0;
             featuresRating = new List<double>();
             isTrue = false;
+        }
+    }
+
+    class FeatureData
+    {
+        public List<int> featuresVector;
+        public List<List<int>> features;
+
+        public FeatureData()
+        {
+            featuresVector = new List<int>();
+            features = new List<List<int>>();
         }
     }
 
@@ -196,7 +244,7 @@ namespace WatsonCompetitionCode
             writer.Close();
         }
 
-        public void fileWriter(List<bool> results, Dictionary<int, Candidate> candidates, string fileName)
+        public void fileWriter(List<bool> results, Dictionary<int, Candidate> candidates, string fileName, bool write)
         {
             File.Delete(@fileName);
             var writer = new StreamWriter(File.OpenWrite(@fileName));
@@ -205,23 +253,33 @@ namespace WatsonCompetitionCode
             string stringToWrite = "";
             string f = "FALSE: ";
             string t = "TRUE: ";
+            int score = 0;
             while (candidates.ContainsKey(i))
             {
                 candidates.TryGetValue(i, out candidate);
                 stringToWrite = candidate.rowNumber.ToString();
                 if (results[i - 1] == true)
                 {
-                    if (candidate.isTrue == true) writer.WriteLine(stringToWrite);
-                    else writer.WriteLine(f + stringToWrite);
+                    if (candidate.isTrue == true)
+                    {
+                        if (write) writer.WriteLine(stringToWrite);
+                        score++;
+                    }
+                    else
+                    {
+                        if (write) writer.WriteLine(f + stringToWrite);
+                        score--;
+                    }
                     // writer.WriteLine(stringToWrite);
                 }
                 else // for debuging only (remove for final program)
                 {
-                    if (candidate.isTrue == true) writer.WriteLine(t + stringToWrite);
+                    if (candidate.isTrue == true && write) writer.WriteLine(t + stringToWrite);
                 }
                 i++;
             }
             writer.Close();
+            Console.WriteLine("Score: " + score);
         }
 
         public List<int> removeExtraneousData(Dictionary<int, Candidate> candidates)
@@ -297,7 +355,6 @@ namespace WatsonCompetitionCode
                     pair.Value.featuresRating.RemoveAt(removeData.Max());
                 }
                 columns.RemoveAt(removeData.Max());
-                //Console.WriteLine("Removed Column " + removeData.Max());
                 removeData.Remove(removeData.Max());
             }
 
@@ -372,9 +429,32 @@ namespace WatsonCompetitionCode
                     pair.Value.featuresRating.RemoveAt(removeData.Max());
                 }
                 columns.RemoveAt(removeData.Max());
-                //Console.WriteLine("Removed Column " + removeData.Max());
                 removeData.Remove(removeData.Max());
             }
+        }
+
+        public FeatureData readFeatures(string fileName)
+        {
+            // Assumes file is 1 indexed (like Matlab)
+            FeatureData keepIndex = new FeatureData();
+            var reader = new StreamReader(File.OpenRead(@fileName));
+            while (!reader.EndOfStream)
+            {
+                var line = reader.ReadLine();
+                if (!line.Equals(""))
+                {
+                    var values = line.Split(',');
+                    keepIndex.features.Add(new List<int>());
+                    foreach (string val in values)
+                    {
+                        int conVal = Convert.ToInt32(val) - 1;
+                        keepIndex.featuresVector.Add(conVal);
+                        keepIndex.features[keepIndex.features.Count() - 1].Add(conVal);
+                    }
+                }
+            }
+            reader.Close();
+            return keepIndex;
         }
 
         public Dictionary<int, Candidate> randSample(Dictionary<int, Candidate> candidates, int FperT)
@@ -383,7 +463,7 @@ namespace WatsonCompetitionCode
             int i = 1;
             Random random = new Random();
             int average = (int)55 / FperT;
-            int index = (int)(random.NextDouble() * (2 * average));
+            int index = (int)(random.NextDouble() * (2 * average)) + 1;
             int count = 0;
             foreach (KeyValuePair<int, Candidate> pair in candidates)
             {
@@ -395,12 +475,12 @@ namespace WatsonCompetitionCode
                 }
                 else
                 {
-                    if (count == index)
+                    if (count >= index)
                     {
                         final.Add(i, c);
                         i++;
                         count = 0;
-                        index = (int)(random.NextDouble() * (2 * average));
+                        index = (int)(random.NextDouble() * (2 * average)) + 1;
                     }
                     count++;
                 }
@@ -547,6 +627,64 @@ namespace WatsonCompetitionCode
             }
 
             return sd;
+        }
+
+        public List<List<int>> BruteForceTest(FeatureData fd, StatisticalData sd, Dictionary<int, Candidate> candidates)
+        {
+            // arraySplit
+            double CR = 0.5;
+            int ND = 150;
+            double LR = 0.2;
+            int maxNumRBF = 5;
+            List<List<int>> bestFeatures = new List<List<int>>();
+            bestFeatures.Add(fd.featuresVector);
+
+            List<int> numNodes = new List<int>();
+            numNodes.Add(ND);
+            List<double> learningRate = new List<double>();
+            learningRate.Add(LR);
+
+            EnsembleRBF rbf = new EnsembleRBF(numNodes, bestFeatures, learningRate, sd, candidates, true);
+            int mostRight = rbf.trainSystem(candidates, CR, 30);
+
+            List<List<int>> tempFeat = new List<List<int>>();
+            tempFeat.Add(new List<int>());
+            Random rand = new Random();
+            int output = 0;
+            int totRight = 0;
+            for (int k = 1; k < maxNumRBF; k++)
+            {
+                tempFeat.Add(new List<int>());
+                numNodes.Add((int)(100 * (rand.NextDouble() - 0.5) + ND));
+                learningRate.Add(LR + 0.02 * (rand.NextDouble() - 0.5));
+	            for (int j = 0; j < 20; j++)
+	            {
+                    for (int m = 0; m <= k; m++) tempFeat[m] = new List<int>();
+                    for (int m = 0; m < fd.featuresVector.Count(); m++)
+                    {
+                        output = (int)((k + 0.99999)*rand.NextDouble());
+                        tempFeat[output].Add(fd.featuresVector[m]);
+                    }
+		            
+                    rbf = new EnsembleRBF(numNodes, bestFeatures, learningRate, sd, candidates, true);
+                    totRight = rbf.trainSystem(candidates, CR, 30);
+
+		            if (totRight > mostRight)
+		            {
+			            mostRight = totRight;
+                        bestFeatures = new List<List<int>>();
+                        for (int m = 0; m < tempFeat.Count(); m++)
+                        {
+                            bestFeatures.Add(new List<int>());
+                            for (int n = 0; n < tempFeat[m].Count(); n++)
+                            {
+                                bestFeatures[m].Add(tempFeat[m][n]);
+                            }
+                        }
+		            }
+	            }
+            }
+            return bestFeatures;
         }
     }
 }
